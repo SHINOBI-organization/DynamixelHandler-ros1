@@ -1,0 +1,3 @@
+[submodule "include/mylib_dynamixel"]
+	path = include/mylib_dynamixel
+	url = https://github.com/SHINOBI-organization/lib_dynamixel.git
