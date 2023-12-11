@@ -6,6 +6,16 @@ Dynamixelとやり取りを行うライブラリは[別のリポジトリ](https
 
 note: ROS1のみ対応
 
+## how to install
+
+```
+$ cd ~/catkin_ws/src
+$ git clone https://github.com/SHINOBI-organization/DynamixelHandler-ros1 dynamixel_handler
+$ cd ./dynamixel_handler
+$ git submodule init
+$ git submodule update
+```
+
 ## 初期設定と注意事項
 
 `include\mylib_dynamixel\download\port_handler_linux.cpp` 内の `LATENCY_TIMER` と使用するUBSデバイスのlatency timerを一致させる必要がある．
