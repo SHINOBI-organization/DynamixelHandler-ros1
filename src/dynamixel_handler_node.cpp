@@ -13,6 +13,7 @@ std::string DEVICE_NAME;
 int         BAUDRATE;
 int         loop_rate;
 bool        varbose;
+int         error_ratio;
 
 struct Dynamixel{
     int32_t goal_position;
@@ -25,20 +26,20 @@ std::vector<Dynamixel> dynamixel_chain;
 bool is_updated = false;
 
 // ここら変の情報は型番固有の情報なので， dynamixel_parameter.hpp/cpp側に記述して，将来的には自動で読み込ませるようにしたい．
-int64_t rad2pulse(double rad) { return rad * 4096.0 / (2.0*M_PI/*rad*/) + 2048; }
-double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * (2.0*M_PI/*rad*/) / 4096.0; }
-int64_t mA2pulse(double mA) { return mA / 1.0/*mA*/; }
-double  pulse2mA(int64_t pulse) { return pulse * 1.0/*mA*/; }
-// int64_t rad_s2pulse(double rad_s) { return rad_s * 0.229/*rev/sec*/ / (2.0*M_PI/*rad*/) /*rad/min*/ * 60 /*rad/sec*/; }
-// double  pulse2rad_s(int64_t pulse) { return pulse * 0.229/*rev/sec*/ * (2.0*M_PI/*rad*/) /*rad/min*/ / 60 /*rad/sec*/; }
+// int64_t deg2pulse(double deg) { return deg * 4096.0 / 360.0 + 2048; }
+// double  pulse2deg(int64_t pulse) { return (pulse - 2048 ) * 360.0 / 4096.0; }
+int64_t rad2pulse(double rad) { return rad * 4096.0 / (2.0 * M_PI) + 2048; }
+double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0; }
+// int64_t mA2pulse(double mA) { return mA / 1.0; }
+// double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
-void FindServo(int id_max) {   
+void FindDynamixel(int id_max) {   
     id_list.clear(); // push_backされれるため， id_listの中身を空にする
     for (int id = 1; id <= id_max; id++) {
         bool is_found = false;
-        for (size_t i = 0; i < 5; i++) {
+        for (size_t i = 0; i < 3; i++) {
             if (dyn_comm.Ping(id)) is_found = true;
-            ros::Duration(0.02).sleep();
+            ros::Duration(0.01).sleep();
         }
         if (is_found) {
             id_list.push_back(id);
@@ -47,12 +48,21 @@ void FindServo(int id_max) {
     }
 }
 
+void RebootDynamixel(int id){
+    auto prev_state= dyn_comm.Read(id, torque_enable);
+    if( prev_state == TORQUE_ENABLE) dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
+    dyn_comm.Reboot(id);
+    ros::Duration(0.5).sleep();
+    dyn_comm.Write(id, torque_enable, prev_state);
+    ROS_WARN("Servo id [%d] is rebooted", id);
+}
+
 void InitDynamixelChain(int id_max){
     // id_listの作成
-    FindServo(id_max);
+    FindDynamixel(id_max);
     assert(id_list.size() != 0);
 
-    // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて位置制御モードにしてトルクON    
+    // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list) {
         dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
         dyn_comm.Write(id, operating_mode, OPERATING_MODE_POSITION);
@@ -60,6 +70,8 @@ void InitDynamixelChain(int id_max){
         dyn_comm.Write(id, profile_velocity, 100); // 0~32767 数字は適当
         int present_pos = dyn_comm.Read(id, present_position);
         dyn_comm.Write(id, goal_position, present_pos);
+        bool is_hardware_error = dyn_comm.Read(id, hardware_error_status); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
+        if (is_hardware_error) RebootDynamixel(id);
         dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
         if(dyn_comm.Read(id, torque_enable) == TORQUE_DISABLE) ROS_WARN("Servo id [%d] failed to enable torque", id);
     }
@@ -85,7 +97,7 @@ bool SyncReadPosition(){
     for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = dynamixel_chain[id_list[i]].present_position; // read失敗時に初期化されないままだと危険なので．
     for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
 
-    int num_success = dyn_comm.SyncRead_fast(id_list, present_position, data_int_list, read_id_list);
+    int num_success = dyn_comm.SyncRead(id_list, present_position, data_int_list, read_id_list);
     // エラー処理
     if (num_success != id_list.size()){
         ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(id_list.size() - num_success));
@@ -101,6 +113,30 @@ bool SyncReadPosition(){
     return num_success>0 ? true : false; // 1つでも成功したら成功とする.あえて冗長に書いている.
 }
 
+void SyncReadHardwareError(){
+    std::vector<int64_t> data_int_list(id_list.size());
+    std::vector<uint8_t> read_id_list(id_list.size());
+    for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = 0;   // read失敗時にエラーだと誤認されないように．
+    for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
+
+    int num_success = dyn_comm.SyncRead(id_list, hardware_error_status, data_int_list, read_id_list);
+
+    bool is_all_zero = true;
+    for (auto data : data_int_list) if (data != 0) is_all_zero = false;
+    if (is_all_zero) return;
+
+    ROS_ERROR("SyncReadHardwareError: Hardware Error is detected");
+    for (int i = 0; i < id_list.size(); i++) {
+        uint8_t error = data_int_list[i];
+        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) ROS_ERROR("  * servo id [%d] : INPUT_VOLTAGE",     id_list[i]);
+        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_HALL_SENSOR", id_list[i]);
+        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERHEATING",       id_list[i]);
+        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_ENCODER",     id_list[i]);
+        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) ROS_ERROR("  * servo id [%d] : ELECTRONICAL_SHOCK",id_list[i]);
+        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERLOAD",          id_list[i]);
+    }
+}
+
 void ShowDynamixelChain(){
     // dynamixel_chainのすべての内容を表示
     for (auto id : id_list) {
@@ -108,14 +144,6 @@ void ShowDynamixelChain(){
         ROS_INFO("  present_position [%d] pulse", dynamixel_chain[id].present_position);
         ROS_INFO("  goal_position    [%d] pulse", dynamixel_chain[id].goal_position);
     }
-}
-
-void RebootDynamixel(int id){
-    dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
-    dyn_comm.Reboot(id);
-    ros::Duration(0.5).sleep();
-    dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
-    if(dyn_comm.Read(id, torque_enable) == TORQUE_DISABLE) ROS_WARN("Servo id [%d] failed to enable torque", id);
 }
 
 void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
@@ -126,12 +154,13 @@ void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
         if (msg.ids.size() == 0) for (auto id : id_list) RebootDynamixel(id);
     }
     if (msg.command == "write") {
+        if( msg.goal_angles.size() == msg.ids.size()) {
         for (int i = 0; i < msg.ids.size(); i++) {
             int id = msg.ids[i];
-            assert(0 <= id && id <= dynamixel_chain.size());
             dynamixel_chain[id].goal_position = rad2pulse(msg.goal_angles[i]);
         }
         is_updated = true;
+        }
     }
 }
 
@@ -140,10 +169,11 @@ int main(int argc, char **argv) {
     ros::NodeHandle nh;
     ros::NodeHandle nh_p("~");
 
-    if (!nh_p.getParam("DEVICE_NAME", DEVICE_NAME)) DEVICE_NAME = "/dev/ttyUSB0";
-    if (!nh_p.getParam("BAUDRATE",    BAUDRATE)   ) BAUDRATE    =  1000000;
-    if (!nh_p.getParam("loop_rate",   loop_rate)  ) loop_rate   =  50;
-    if (!nh_p.getParam("varbose",       varbose)  ) varbose   =  false;
+    if (!nh_p.getParam("DEVICE_NAME",      DEVICE_NAME)) DEVICE_NAME = "/dev/ttyUSB0";
+    if (!nh_p.getParam("BAUDRATE",         BAUDRATE)   ) BAUDRATE    =  1000000;
+    if (!nh_p.getParam("loop_rate",        loop_rate)  ) loop_rate   =  50;
+    if (!nh_p.getParam("varbose",            varbose)  ) varbose     =  false;
+    if (!nh_p.getParam("error_read_ratio", error_ratio)) error_ratio =  100;
     
     int id_max;    
     if (!nh_p.getParam("dyn_id_max",   id_max)) id_max = 35;
@@ -155,10 +185,11 @@ int main(int argc, char **argv) {
 
     InitDynamixelChain(id_max);
 
-    ros::Subscriber sub_dyn_cmd   = nh.subscribe("/dynamixel/cmd",   10, CallBackOfDynamixelCommand);
+    ros::Subscriber sub_cmd = nh.subscribe("/dynamixel/cmd",   10, CallBackOfDynamixelCommand);
     ros::Publisher  pub_dyn_state = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
 
     ros::Rate rate(loop_rate);
+    uint8_t cnt = 0;
     while(ros::ok()) {
         // Dynamixelから現在角をRead & topicをPublish
         bool is_success = SyncReadPosition();
@@ -174,6 +205,8 @@ int main(int argc, char **argv) {
             }
             pub_dyn_state.publish(msg);
         }
+
+        if (cnt++ % error_ratio == 0 && (cnt=1)) SyncReadHardwareError();
 
         // デバック用
         if (varbose) ShowDynamixelChain();
