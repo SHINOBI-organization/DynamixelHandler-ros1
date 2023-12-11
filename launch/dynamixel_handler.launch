@@ -1,0 +1,12 @@
+<launch>
+
+  <node pkg="dynamixel_handler" name="dynamixel_handler_node" type="dynamixel_handler_node" output="screen">
+      <param name="DEVICE_NAME" value="/dev/ttyUSB0"/>
+      <param name="BAUDRATE" value="1000000"/>
+      <param name="loop_rate" value="100"/>
+      <param name="varbose" value="false"/>
+      <param name="search_dynamexl_id_max" value="35"/>
+      <param name="error_read_ratio" value="100"/> <!-- 100ループに一回 Hardware errorを読み取る -->
+  </node>
+
+</launch>
