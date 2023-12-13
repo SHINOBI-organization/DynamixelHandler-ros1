@@ -33,7 +33,7 @@ double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0;
 // int64_t mA2pulse(double mA) { return mA / 1.0; }
 // double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
-void FindDynamixel(int id_max) {   
+void ScanDynamixel(int id_max) {   
     id_list.clear(); // push_backされれるため， id_listの中身を空にする
     for (int id = 1; id <= id_max; id++) {
         bool is_found = false;
@@ -48,32 +48,39 @@ void FindDynamixel(int id_max) {
     }
 }
 
-void RebootDynamixel(int id){
+void ClearErrorDynamixel(int id){
     auto prev_state= dyn_comm.Read(id, torque_enable);
     if( prev_state == TORQUE_ENABLE) dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
+
+        int present_rotation = dynamixel_chain[id].present_position / rad2pulse(M_PI); // 整数値に丸める
+        if (dynamixel_chain[id].present_position < 0) present_rotation--;
+
     dyn_comm.Reboot(id);
     ros::Duration(0.5).sleep();
+
+        dyn_comm.Write(id, homing_offset, present_rotation * rad2pulse(M_PI));
+
     dyn_comm.Write(id, torque_enable, prev_state);
     ROS_WARN("Servo id [%d] is rebooted", id);
 }
 
 void InitDynamixelChain(int id_max){
     // id_listの作成
-    FindDynamixel(id_max);
+    ScanDynamixel(id_max);
     assert(id_list.size() != 0);
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list) {
         dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
-        dyn_comm.Write(id, operating_mode, OPERATING_MODE_POSITION);
+        dyn_comm.Write(id, operating_mode, OPERATING_MODE_EXTENDED_POSITION);  
         dyn_comm.Write(id, profile_acceleration, 500); // 0~32767 数字は適当
         dyn_comm.Write(id, profile_velocity, 100); // 0~32767 数字は適当
         int present_pos = dyn_comm.Read(id, present_position);
         dyn_comm.Write(id, goal_position, present_pos);
         bool is_hardware_error = dyn_comm.Read(id, hardware_error_status); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-        if (is_hardware_error) RebootDynamixel(id);
+        if (is_hardware_error) ClearErrorDynamixel(id);
         dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
-        if(dyn_comm.Read(id, torque_enable) == TORQUE_DISABLE) ROS_WARN("Servo id [%d] failed to enable torque", id);
+        if (dyn_comm.Read(id, torque_enable) == TORQUE_DISABLE) ROS_WARN("Servo id [%d] failed to enable torque", id);
     }
 
     // プログラム内部の変数であるdynamixel_chainの初期化
@@ -150,8 +157,8 @@ void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
     if (msg.command == "show") ShowDynamixelChain();
     if (msg.command == "init") InitDynamixelChain(dynamixel_chain.size());
     if (msg.command == "reboot") { 
-        for (auto id : msg.ids) RebootDynamixel(id);
-        if (msg.ids.size() == 0) for (auto id : id_list) RebootDynamixel(id);
+        for (auto id : msg.ids) ClearErrorDynamixel(id);
+        if (msg.ids.size() == 0) for (auto id : id_list) ClearErrorDynamixel(id);
     }
     if (msg.command == "write") {
         if( msg.goal_angles.size() == msg.ids.size()) {
