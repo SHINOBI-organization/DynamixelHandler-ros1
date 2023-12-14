@@ -7,6 +7,7 @@
 #include <dynamixel_handler/DynamixelCmd.h>
 #include <dynamixel_handler/DynamixelState.h>
 
+using std::vector;
 using namespace dyn_x;
 
 std::string DEVICE_NAME;
@@ -21,8 +22,8 @@ struct Dynamixel{
 };
 
 DynamixelComunicator dyn_comm;
-std::vector<uint8_t> id_list;
-std::vector<Dynamixel> dynamixel_chain;
+vector<uint8_t> id_list;
+vector<Dynamixel> dynamixel_chain;
 bool is_updated = false;
 
 // ここら変の情報は型番固有の情報なので， dynamixel_parameter.hpp/cpp側に記述して，将来的には自動で読み込ませるようにしたい．
@@ -33,7 +34,7 @@ double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0;
 // int64_t mA2pulse(double mA) { return mA / 1.0; }
 // double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
-void ScanDynamixel(int id_max) {   
+vector<uint8_t> ScanDynamixel(int id_max) {   
     id_list.clear(); // push_backされれるため， id_listの中身を空にする
     for (int id = 1; id <= id_max; id++) {
         bool is_found = false;
@@ -93,14 +94,14 @@ void InitDynamixelChain(int id_max){
 }
 
 void SyncWritePosition(){
-    std::vector<int64_t> data_int_list(id_list.size());
+    vector<int64_t> data_int_list(id_list.size());
     for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = dynamixel_chain[id_list[i]].goal_position;
     dyn_comm.SyncWrite(id_list, goal_position, data_int_list);
 }
 
 bool SyncReadPosition(){
-    std::vector<int64_t> data_int_list(id_list.size());
-    std::vector<uint8_t> read_id_list(id_list.size());
+    vector<int64_t> data_int_list(id_list.size());
+    vector<uint8_t> read_id_list(id_list.size());
     for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = dynamixel_chain[id_list[i]].present_position; // read失敗時に初期化されないままだと危険なので．
     for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
 
@@ -121,8 +122,8 @@ bool SyncReadPosition(){
 }
 
 void SyncReadHardwareError(){
-    std::vector<int64_t> data_int_list(id_list.size());
-    std::vector<uint8_t> read_id_list(id_list.size());
+    vector<int64_t> data_int_list(id_list.size());
+    vector<uint8_t> read_id_list(id_list.size());
     for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = 0;   // read失敗時にエラーだと誤認されないように．
     for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
 
