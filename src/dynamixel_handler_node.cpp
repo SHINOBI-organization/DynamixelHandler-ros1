@@ -7,8 +7,12 @@
 #include <dynamixel_handler/DynamixelCmd.h>
 #include <dynamixel_handler/DynamixelState.h>
 
+#include <chrono>
+#include <thread>
+
 using std::vector;
 using namespace dyn_x;
+using namespace std::chrono_literals;
 
 std::string DEVICE_NAME;
 int         BAUDRATE;
@@ -25,6 +29,7 @@ DynamixelComunicator dyn_comm;
 vector<uint8_t> id_list;
 vector<Dynamixel> dynamixel_chain;
 bool is_updated = false;
+bool has_hardware_error = false;
 
 // ここら変の情報は型番固有の情報なので， dynamixel_parameter.hpp/cpp側に記述して，将来的には自動で読み込ませるようにしたい．
 // int64_t deg2pulse(double deg) { return deg * 4096.0 / 360.0 + 2048; }
@@ -35,43 +40,59 @@ double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0;
 // double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
 vector<uint8_t> ScanDynamixel(int id_max) {   
-    id_list.clear(); // push_backされれるため， id_listの中身を空にする
+    vector<uint8_t> id_list_tmp;
     for (int id = 1; id <= id_max; id++) {
         bool is_found = false;
-        for (size_t i = 0; i < 3; i++) {
+        for (size_t i = 0; i < 5; i++) if ( !is_found ) {
             if (dyn_comm.Ping(id)) is_found = true;
-            ros::Duration(0.01).sleep();
+            std::this_thread::sleep_for(0.01s);   
         }
         if (is_found) {
-            id_list.push_back(id);
-            ROS_INFO("Servo id [%d] is found (id range 1 to [%d])", id, id_max);
+            id_list_tmp.push_back(id);
+            printf(" * Servo id [%d] is found (id range 1 to [%d])\n", id, id_max);
         }
     }
+    return id_list_tmp;
 }
 
-void ClearErrorDynamixel(int id){
-    auto prev_state= dyn_comm.Read(id, torque_enable);
-    if( prev_state == TORQUE_ENABLE) dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
+bool ClearErrorDynamixel(int id, DynamixelTorquePermission after_state = TORQUE_ENABLE){
+    auto present_pos = dyn_comm.Read(id, present_position);
+    int present_rotation = present_pos / rad2pulse(M_PI); // 整数値に丸める
+    if (present_pos < 0) present_rotation--;
 
-        int present_rotation = dynamixel_chain[id].present_position / rad2pulse(M_PI); // 整数値に丸める
-        if (dynamixel_chain[id].present_position < 0) present_rotation--;
+        dyn_comm.Reboot(id);
+        std::this_thread::sleep_for(0.5s);   
 
-    dyn_comm.Reboot(id);
-    ros::Duration(0.5).sleep();
-
-        dyn_comm.Write(id, homing_offset, present_rotation * rad2pulse(M_PI));
-
-    dyn_comm.Write(id, torque_enable, prev_state);
-    ROS_WARN("Servo id [%d] is rebooted", id);
+    dyn_comm.Write(id, homing_offset, present_rotation * rad2pulse(M_PI));
+    dyn_comm.Write(id, torque_enable, after_state);
+    return dyn_comm.Read(id, hardware_error_status) == 0; // 0 is no error
 }
 
+bool TorqueEnableDynamixel(int id){
+    dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
+    return dyn_comm.Read(id, torque_enable) != TORQUE_ENABLE;
+}
+
+bool TorqueDisableDynamixel(int id){
+    dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
+    return dyn_comm.Read(id, torque_enable) != TORQUE_DISABLE;
+}
+
+/// dynamixel_chainの存在を前提としない関数↑ dymamixel_communicator側に実装する．
+
+/// dynamixel_chainの存在を前提とする関数↓（あとで別のclassでまとめる．）
 void InitDynamixelChain(int id_max){
     // id_listの作成
-    ScanDynamixel(id_max);
-    assert(id_list.size() != 0);
+    ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
+    id_list = ScanDynamixel(id_max);
+    if(id_list.size() == 0) {
+        ROS_ERROR("Dynamicel is not found in USB device [%s]", dyn_comm.port_name().c_str());
+        exit(1);
+    }
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list) {
+        if ( TorqueDisableDynamixel(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
         dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
         dyn_comm.Write(id, operating_mode, OPERATING_MODE_EXTENDED_POSITION);  
         dyn_comm.Write(id, profile_acceleration, 500); // 0~32767 数字は適当
@@ -79,9 +100,8 @@ void InitDynamixelChain(int id_max){
         int present_pos = dyn_comm.Read(id, present_position);
         dyn_comm.Write(id, goal_position, present_pos);
         bool is_hardware_error = dyn_comm.Read(id, hardware_error_status); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-        if (is_hardware_error) ClearErrorDynamixel(id);
-        dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
-        if (dyn_comm.Read(id, torque_enable) == TORQUE_DISABLE) ROS_WARN("Servo id [%d] failed to enable torque", id);
+        if (is_hardware_error) ClearErrorDynamixel(id, TORQUE_DISABLE);
+        if ( TorqueEnableDynamixel(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
     }
 
     // プログラム内部の変数であるdynamixel_chainの初期化
@@ -105,7 +125,9 @@ bool SyncReadPosition(){
     for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = dynamixel_chain[id_list[i]].present_position; // read失敗時に初期化されないままだと危険なので．
     for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
 
-    int num_success = dyn_comm.SyncRead(id_list, present_position, data_int_list, read_id_list);
+    int num_success = (has_hardware_error)
+                        ? dyn_comm.SyncRead     (id_list, present_position, data_int_list, read_id_list)  // エラーがあるときは遅い方
+                        : dyn_comm.SyncRead_fast(id_list, present_position, data_int_list, read_id_list); // エラーがあるときは早い方
     // エラー処理
     if (num_success != id_list.size()){
         ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(id_list.size() - num_success));
@@ -122,20 +144,21 @@ bool SyncReadPosition(){
 }
 
 void SyncReadHardwareError(){
-    vector<int64_t> data_int_list(id_list.size());
+    vector<int64_t> error_int_list(id_list.size());
     vector<uint8_t> read_id_list(id_list.size());
-    for (size_t i = 0; i < id_list.size(); i++) data_int_list[i] = 0;   // read失敗時にエラーだと誤認されないように．
+    for (size_t i = 0; i < id_list.size(); i++) error_int_list[i] = 0;   // read失敗時にエラーだと誤認されないように．
     for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
 
-    int num_success = dyn_comm.SyncRead(id_list, hardware_error_status, data_int_list, read_id_list);
+    int num_success = dyn_comm.SyncRead(id_list, hardware_error_status, error_int_list, read_id_list);
+    ROS_INFO("SyncReadHardwareError: Checking hardware error");
 
-    bool is_all_zero = true;
-    for (auto data : data_int_list) if (data != 0) is_all_zero = false;
-    if (is_all_zero) return;
+    has_hardware_error = false;
+    for (auto error : error_int_list) has_hardware_error += (bool)error; // errorがあるときは0以外の値になる．
+    if ( !has_hardware_error ) return;
 
     ROS_ERROR("SyncReadHardwareError: Hardware Error is detected");
     for (int i = 0; i < id_list.size(); i++) {
-        uint8_t error = data_int_list[i];
+        uint8_t error = error_int_list[i];
         if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) ROS_ERROR("  * servo id [%d] : INPUT_VOLTAGE",     id_list[i]);
         if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_HALL_SENSOR", id_list[i]);
         if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERHEATING",       id_list[i]);
