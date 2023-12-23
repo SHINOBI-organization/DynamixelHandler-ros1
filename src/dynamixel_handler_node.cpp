@@ -61,7 +61,7 @@ bool ClearErrorDynamixel(int id, DynamixelTorquePermission after_state = TORQUE_
     if (present_pos < 0) present_rotation--;
 
         dyn_comm.Reboot(id);
-        std::this_thread::sleep_for(0.5s);   
+        std::this_thread::sleep_for(0.5s);
 
     dyn_comm.Write(id, homing_offset, present_rotation * rad2pulse(M_PI));
     dyn_comm.Write(id, torque_enable, after_state);
@@ -70,11 +70,13 @@ bool ClearErrorDynamixel(int id, DynamixelTorquePermission after_state = TORQUE_
 
 bool TorqueEnableDynamixel(int id){
     dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
+    std::this_thread::sleep_for(0.01s);
     return dyn_comm.Read(id, torque_enable) != TORQUE_ENABLE;
 }
 
 bool TorqueDisableDynamixel(int id){
     dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
+    std::this_thread::sleep_for(0.01s);
     return dyn_comm.Read(id, torque_enable) != TORQUE_DISABLE;
 }
 
@@ -144,13 +146,14 @@ bool SyncReadPosition(){
 }
 
 void SyncReadHardwareError(){
+    ROS_INFO("SyncReadHardwareError: Checking hardware error");
+    
     vector<int64_t> error_int_list(id_list.size());
     vector<uint8_t> read_id_list(id_list.size());
     for (size_t i = 0; i < id_list.size(); i++) error_int_list[i] = 0;   // read失敗時にエラーだと誤認されないように．
     for (size_t i = 0; i < id_list.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
 
     int num_success = dyn_comm.SyncRead(id_list, hardware_error_status, error_int_list, read_id_list);
-    ROS_INFO("SyncReadHardwareError: Checking hardware error");
 
     has_hardware_error = false;
     for (auto error : error_int_list) has_hardware_error += (bool)error; // errorがあるときは0以外の値になる．
@@ -220,8 +223,10 @@ int main(int argc, char **argv) {
     ros::Publisher  pub_dyn_state = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
 
     ros::Rate rate(loop_rate);
-    uint8_t cnt = 0;
+    uint cnt = 0;
     while(ros::ok()) {
+        if ( ++cnt % error_ratio == 0 ) { SyncReadHardwareError(); cnt=0; };
+
         // Dynamixelから現在角をRead & topicをPublish
         bool is_success = SyncReadPosition();
         if ( is_success ) {
@@ -236,8 +241,6 @@ int main(int argc, char **argv) {
             }
             pub_dyn_state.publish(msg);
         }
-
-        if (cnt++ % error_ratio == 0 && (cnt=1)) SyncReadHardwareError();
 
         // デバック用
         if (varbose) ShowDynamixelChain();
