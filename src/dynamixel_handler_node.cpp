@@ -8,7 +8,6 @@
 #include <dynamixel_handler/DynamixelState.h>
 
 #include <chrono>
-#include <thread>
 
 using std::vector;
 using namespace dyn_x;
@@ -39,54 +38,10 @@ double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0;
 // int64_t mA2pulse(double mA) { return mA / 1.0; }
 // double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
-vector<uint8_t> ScanDynamixel(int id_max) {   
-    vector<uint8_t> id_list_tmp;
-    for (int id = 1; id <= id_max; id++) {
-        bool is_found = false;
-        for (size_t i = 0; i < 5; i++) if ( !is_found ) {
-            if (dyn_comm.Ping(id)) is_found = true;
-            std::this_thread::sleep_for(0.01s);   
-        }
-        if (is_found) {
-            id_list_tmp.push_back(id);
-            printf(" * Servo id [%d] is found (id range 1 to [%d])\n", id, id_max);
-        }
-    }
-    return id_list_tmp;
-}
-
-bool ClearErrorDynamixel(int id, DynamixelTorquePermission after_state = TORQUE_ENABLE){
-    auto present_pos = dyn_comm.Read(id, present_position);
-    int present_rotation = present_pos / rad2pulse(M_PI); // 整数値に丸める
-    if (present_pos < 0) present_rotation--;
-
-        dyn_comm.Reboot(id);
-        std::this_thread::sleep_for(0.5s);
-
-    dyn_comm.Write(id, homing_offset, present_rotation * rad2pulse(M_PI));
-    dyn_comm.Write(id, torque_enable, after_state);
-    return dyn_comm.Read(id, hardware_error_status) == 0; // 0 is no error
-}
-
-bool TorqueEnableDynamixel(int id){
-    dyn_comm.Write(id, torque_enable, TORQUE_ENABLE);
-    std::this_thread::sleep_for(0.01s);
-    return dyn_comm.Read(id, torque_enable) != TORQUE_ENABLE;
-}
-
-bool TorqueDisableDynamixel(int id){
-    dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
-    std::this_thread::sleep_for(0.01s);
-    return dyn_comm.Read(id, torque_enable) != TORQUE_DISABLE;
-}
-
-/// dynamixel_chainの存在を前提としない関数↑ dymamixel_communicator側に実装する．
-
-/// dynamixel_chainの存在を前提とする関数↓（あとで別のclassでまとめる．）
 void InitDynamixelChain(int id_max){
     // id_listの作成
     ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
-    id_list = ScanDynamixel(id_max);
+    id_list = dyn_comm.Scan(id_max);
     if(id_list.size() == 0) {
         ROS_ERROR("Dynamicel is not found in USB device [%s]", dyn_comm.port_name().c_str());
         exit(1);
@@ -94,7 +49,7 @@ void InitDynamixelChain(int id_max){
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list) {
-        if ( TorqueDisableDynamixel(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
+        if ( dyn_comm.TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
         dyn_comm.Write(id, torque_enable, TORQUE_DISABLE);
         dyn_comm.Write(id, operating_mode, OPERATING_MODE_EXTENDED_POSITION);  
         dyn_comm.Write(id, profile_acceleration, 500); // 0~32767 数字は適当
@@ -102,8 +57,8 @@ void InitDynamixelChain(int id_max){
         int present_pos = dyn_comm.Read(id, present_position);
         dyn_comm.Write(id, goal_position, present_pos);
         bool is_hardware_error = dyn_comm.Read(id, hardware_error_status); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-        if (is_hardware_error) ClearErrorDynamixel(id, TORQUE_DISABLE);
-        if ( TorqueEnableDynamixel(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
+        if (is_hardware_error) dyn_comm.ClearError(id, TORQUE_DISABLE);
+        if ( dyn_comm.TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
     }
 
     // プログラム内部の変数であるdynamixel_chainの初期化
@@ -184,8 +139,8 @@ void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
     if (msg.command == "show") ShowDynamixelChain();
     if (msg.command == "init") InitDynamixelChain(dynamixel_chain.size());
     if (msg.command == "reboot") { 
-        for (auto id : msg.ids) ClearErrorDynamixel(id);
-        if (msg.ids.size() == 0) for (auto id : id_list) ClearErrorDynamixel(id);
+        for (auto id : msg.ids) dyn_comm.ClearError(id);
+        if (msg.ids.size() == 0) for (auto id : id_list) dyn_comm.ClearError(id);
     }
     if (msg.command == "write") {
         if( msg.goal_angles.size() == msg.ids.size()) {
