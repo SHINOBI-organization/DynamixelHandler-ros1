@@ -4,7 +4,6 @@
 // int64_t deg2pulse(double deg) { return deg * 4096.0 / 360.0 + 2048; }
 // double  pulse2deg(int64_t pulse) { return (pulse - 2048 ) * 360.0 / 4096.0; }
 int64_t rad2pulse(double rad) { return rad * 4096.0 / (2.0 * M_PI) + 2048; }
-double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0; }
 // int64_t mA2pulse(double mA) { return mA / 1.0; }
 // double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
@@ -30,7 +29,7 @@ bool DynamixelHandler::ScanDynamixels(uint8_t id_max) {
             sleep_for(0.01s);  
         }
         if (is_found) {
-            auto dyn_model = dyn_comm_.Read(id, model_number);
+            auto dyn_model = dyn_comm_.Read(model_number, id);
             id_list_x_.push_back(id); // とりあえず全てのサーボをx_seriesとして扱う
             // if ( is_x_series(dyn_model) ) id_list_x_.push_back(id);
             // if ( is_p_series(dyn_model) ) id_list_p_.push_back(id);
@@ -41,83 +40,71 @@ bool DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 }
 
 bool DynamixelHandler::ClearError(uint8_t id, DynamixelTorquePermission after_state){
-    auto present_pos = dyn_comm_.Read(id, present_position);
+    auto present_pos = dyn_comm_.Read(present_position, id);
     int present_rotation = present_pos / 2048; // 整数値に丸める
     if (present_pos < 0) present_rotation--;
 
         dyn_comm_.Reboot(id);
         sleep_for(0.5s);
 
-    dyn_comm_.Write(id, homing_offset, present_rotation * 2048);
-    dyn_comm_.Write(id, torque_enable, after_state);
-    return dyn_comm_.Read(id, hardware_error_status) == 0; // 0 is no error
+    dyn_comm_.Write(homing_offset, id, present_rotation * 2048);
+    dyn_comm_.Write(torque_enable, id, after_state);
+    return dyn_comm_.Read(hardware_error_status, id) == 0; // 0 is no error
 }
 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
-    dyn_comm_.Write(id, torque_enable, TORQUE_ENABLE);
+    dyn_comm_.Write(torque_enable, id, TORQUE_ENABLE);
     sleep_for(0.01s);
-    return dyn_comm_.Read(id, torque_enable) != TORQUE_ENABLE;
+    return dyn_comm_.Read(torque_enable, id) != TORQUE_ENABLE;
 }
 
 bool DynamixelHandler::TorqueDisable(uint8_t id){
-    dyn_comm_.Write(id, torque_enable, TORQUE_DISABLE);
+    dyn_comm_.Write(torque_enable, id, TORQUE_DISABLE);
     sleep_for(0.01s);
-    return dyn_comm_.Read(id, torque_enable) != TORQUE_DISABLE;
+    return dyn_comm_.Read(torque_enable, id) != TORQUE_DISABLE;
 }
 
 void DynamixelHandler::SyncWritePosition(){
     vector<int64_t> data_int_list(id_list_x_.size());
     for (size_t i = 0; i < id_list_x_.size(); i++) data_int_list[i] = dynamixel_chain[id_list_x_[i]].goal_position;
-    dyn_comm_.SyncWrite(id_list_x_, goal_position, data_int_list);
+    dyn_comm_.SyncWrite(goal_position, id_list_x_, data_int_list);
 }
 
 bool DynamixelHandler::SyncReadPosition(){
-    vector<int64_t> data_int_list(id_list_x_.size());
-    vector<uint8_t> read_id_list(id_list_x_.size());
-    for (size_t i = 0; i < id_list_x_.size(); i++) data_int_list[i] = dynamixel_chain[id_list_x_[i]].present_position; // read失敗時に初期化されないままだと危険なので．
-    for (size_t i = 0; i < id_list_x_.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
-
-    int num_success = (has_hardware_error)
-                        ? dyn_comm_.SyncRead     (id_list_x_, present_position, data_int_list, read_id_list)  // エラーがあるときは遅い方
-                        : dyn_comm_.SyncRead_fast(id_list_x_, present_position, data_int_list, read_id_list); // エラーがあるときは早い方
+    auto id_data_map = (has_hardware_error)
+        ? dyn_comm_.SyncRead     (present_position, id_list_x_)  // エラーがあるときは遅い方
+        : dyn_comm_.SyncRead_fast(present_position, id_list_x_); // エラーがあるときは早い方
     // エラー処理
-    if (num_success != id_list_x_.size()){
-        ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(id_list_x_.size() - num_success));
-        for (size_t i = 0; i < id_list_x_.size(); i++){
-            if (std::find(id_list_x_.begin(), id_list_x_.end(), read_id_list[i]) == id_list_x_.end())
-                ROS_WARN("  * servo id [%d] failed to read", id_list_x_[i]);
-        }
+    if (id_data_map.size() < id_list_x_.size()){
+        ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(id_list_x_.size() - id_data_map.size()));
+        for ( auto id : id_list_x_ )
+            if ( id_data_map.find(id) == id_data_map.end() )
+                ROS_WARN("  * servo id [%d] failed to read", id);
     }
     // 読み込んだデータをdynamixel_chainに反映
-    for (size_t i = 0; i < id_list_x_.size(); i++) // data_int_listの初期値がpresent_positionなので，read失敗時はそのままになる．
-        dynamixel_chain[id_list_x_[i]].present_position = data_int_list[i]; 
-
-    return num_success>0 ? true : false; // 1つでも成功したら成功とする.あえて冗長に書いている.
+    for (auto id_pos : id_data_map) dynamixel_chain[id_pos.first].present_position = id_pos.second; 
+    return id_data_map.size()>0; // 1つでも成功したら成功とする.
 }
 
 void DynamixelHandler::SyncReadHardwareError(){
-    ROS_INFO("SyncReadHardwareError: Checking hardware error");
+    ROS_INFO("SyncReadHardwareInfo: Checking hardware error");
     
-    vector<int64_t> error_int_list(id_list_x_.size());
-    vector<uint8_t> read_id_list(id_list_x_.size());
-    for (size_t i = 0; i < id_list_x_.size(); i++) error_int_list[i] = 0;   // read失敗時にエラーだと誤認されないように．
-    for (size_t i = 0; i < id_list_x_.size(); i++) read_id_list[i]  = 255; // あり得ない値(idは0~252)に設定して，read失敗時に検出できるようにする
-
-    int num_success = dyn_comm_.SyncRead(id_list_x_, hardware_error_status, error_int_list, read_id_list);
+    auto id_error_map = dyn_comm_.SyncRead(hardware_error_status, id_list_x_);
 
     has_hardware_error = false;
-    for (auto error : error_int_list) has_hardware_error += (bool)error; // errorがあるときは0以外の値になる．
+    for (auto pair : id_error_map) has_hardware_error += (bool)pair.second; // errorがあるときは0以外の値になる．
     if ( !has_hardware_error ) return;
 
     ROS_ERROR("SyncReadHardwareError: Hardware Error is detected");
-    for (int i = 0; i < id_list_x_.size(); i++) {
-        uint8_t error = error_int_list[i];
-        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) ROS_ERROR("  * servo id [%d] : INPUT_VOLTAGE",     id_list_x_[i]);
-        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_HALL_SENSOR", id_list_x_[i]);
-        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERHEATING",       id_list_x_[i]);
-        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_ENCODER",     id_list_x_[i]);
-        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) ROS_ERROR("  * servo id [%d] : ELECTRONICAL_SHOCK",id_list_x_[i]);
-        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERLOAD",          id_list_x_[i]);
+    for (auto pair : id_error_map) {
+        uint8_t id = pair.first;
+        uint8_t error = pair.second;
+        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) ROS_ERROR("  * servo id [%d] : INPUT_VOLTAGE",     id);
+        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_HALL_SENSOR", id);
+        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERHEATING",       id);
+        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_ENCODER",     id);
+        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) ROS_ERROR("  * servo id [%d] : ELECTRONICAL_SHOCK",id);
+        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERLOAD",          id);
     }
 }
 
