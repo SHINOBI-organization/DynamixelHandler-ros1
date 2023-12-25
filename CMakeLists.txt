@@ -158,6 +158,7 @@ add_executable(dynamixel_handler_node
 	include/mylib_dynamixel/download/port_handler_linux.cpp
 	include/mylib_dynamixel/download/port_handler.cpp
 	include/mylib_dynamixel/src/dynamixel_communicator.cpp
+	include/mylib_dynamixel/src/dynamixel_communicator_withRetry.cpp
 	
 	src/dynamixel_handler.cpp
 	src/main.cpp

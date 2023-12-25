@@ -5,18 +5,15 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max, uint8_t num_try, uint8_
     id_list_x_.clear();
     id_list_p_.clear();
 
-    for (uint8_t id = 0; id <= id_max; id++)
-        for (size_t i = 0; i < num_try; i++) {
-            bool is_found = dyn_comm_.Ping(id);
-            sleep_for(1ms*wait_time_ms);
-            if ( !is_found ) continue;
-            int dyn_model = dyn_comm_.Read(model_number, id);
+    for (int id = 0; id <= id_max; id++) {
+        if ( !dyn_comm_.tryPing(id) ) continue;
+        int dyn_model = dyn_comm_.tryRead(model_number, id);
             if ( is_x_series(dyn_model) ) { 
                 ROS_INFO(" * X series servo id [%d] is found", id);
-                id_list_x_.push_back(id++); i=0; // 見つかったid残りの検査をスキップ
+            id_list_x_.push_back(id); // 見つかったid残りの検査をスキップ
             } else if ( is_p_series(dyn_model) ) { 
                 ROS_INFO(" * P series servo id [%d] is found", id);
-                id_list_p_.push_back(id++); i=0; // 見つかったid残りの検査をスキップ
+            id_list_p_.push_back(id); // 見つかったid残りの検査をスキップ
             } else { 
                 ROS_WARN(" * Unkwon model [%d] servo id [%d] is found", dyn_model, id);
         }

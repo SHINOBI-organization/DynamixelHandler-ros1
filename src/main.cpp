@@ -19,14 +19,18 @@ bool DynamixelHandler::Initialize(){
         return false;
     }
 
+    // serial通信のretry設定
+    int num_try, msec_interval;
+    if (!nh_p.getParam("dyn_comm_retry_num",     num_try      )) num_try       = 5;
+    if (!nh_p.getParam("dyn_comm_inerval_msec",  msec_interval)) msec_interval = 10;
+    dyn_comm_.set_retry_config(num_try, msec_interval);
+
     // id_listの作成
-    int num_expexted, id_max, num_try, wait_time_ms;
+    int num_expexted, id_max;
     if (!nh_p.getParam("dyn_num_chained_servo",    num_expexted)) num_expexted = 0; // 0のときはチェックしない
     if (!nh_p.getParam("dyn_search_max_id",        id_max      )) id_max       = 35;
-    if (!nh_p.getParam("dyn_search_try_num",       num_try     )) num_try      = 5;
-    if (!nh_p.getParam("dyn_search_wait_time_ms",  wait_time_ms)) wait_time_ms = 10;
     ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
-    auto num_found = ScanDynamixels(id_max, num_try, wait_time_ms);
+    auto num_found = ScanDynamixels(id_max);
     if( num_found==0 ) {
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
         return false;

@@ -36,7 +36,7 @@ class DynamixelHandler {
 
     private:
         //* Dynamixelとの通信を超えた機能
-        static uint8_t ScanDynamixels(uint8_t id_max, uint8_t num_try=5, uint8_t wait_time_ms=10);
+        static uint8_t ScanDynamixels(uint8_t id_max);
         //* Dynamixel単体との通信の組み合わせ
         static bool ClearError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
         static bool TorqueEnable(uint8_t servo_id);

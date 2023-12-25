@@ -7,8 +7,8 @@
       <param name="varbose" value="false"/>
       <param name="dyn_num_chained_servo"   value="12"/>
       <param name="dyn_search_max_id"       value="35"/>
-      <param name="dyn_search_try_num"      value="4"/>
-      <param name="dyn_search_wait_time_ms" value="8"/>
+      <param name="dyn_comm_retry_num"      value="3"/>
+      <param name="dyn_comm_inerval_msec"   value="5"/>
       <param name="error_read_ratio" value="100"/> <!-- 100ループに一回 Hardware errorを読み取る -->
   </node>
 
