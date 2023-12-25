@@ -3,9 +3,12 @@
   <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
       <param name="DEVICE_NAME" value="/dev/ttyUSB0"/>
       <param name="BAUDRATE" value="1000000"/>
-      <param name="loop_rate" value="200"/>
+      <param name="loop_rate" value="100"/>
       <param name="varbose" value="false"/>
-      <param name="search_dynamexl_id_max" value="35"/>
+      <param name="dyn_num_chained_servo"   value="12"/>
+      <param name="dyn_search_max_id"       value="35"/>
+      <param name="dyn_search_try_num"      value="4"/>
+      <param name="dyn_search_wait_time_ms" value="8"/>
       <param name="error_read_ratio" value="100"/> <!-- 100ループに一回 Hardware errorを読み取る -->
   </node>
 

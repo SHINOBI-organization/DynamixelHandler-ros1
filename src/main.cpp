@@ -20,16 +20,23 @@ bool DynamixelHandler::Initialize(){
     }
 
     // id_listの作成
-    int id_max;    
-    if (!nh_p.getParam("dyn_id_max",   id_max)) id_max = 35;
-    assert(0 <= id_max && id_max <= 252);
+    int num_expexted, id_max, num_try, wait_time_ms;
+    if (!nh_p.getParam("dyn_num_chained_servo",    num_expexted)) num_expexted = 0; // 0のときはチェックしない
+    if (!nh_p.getParam("dyn_search_max_id",        id_max      )) id_max       = 35;
+    if (!nh_p.getParam("dyn_search_try_num",       num_try     )) num_try      = 5;
+    if (!nh_p.getParam("dyn_search_wait_time_ms",  wait_time_ms)) wait_time_ms = 10;
     ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
-    if( !ScanDynamixels(id_max) ) {
+    auto num_found = ScanDynamixels(id_max, num_try, wait_time_ms);
+    if( num_found==0 ) {
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
         return false;
     }
+    if( num_expexted>0 && num_expexted>num_found ) {
+        ROS_ERROR("Number of Dynamixel is not matched. Expected [%d], but found [%d]", num_expexted, num_found);
+        return false;
+    }
 
-    // main loop eの設定
+    // main loop の設定
     if (!nh_p.getParam("varbose",          varbose_    )) varbose_     =  false;
     if (!nh_p.getParam("loop_rate",        loop_rate_  )) loop_rate_   =  50;
     if (!nh_p.getParam("error_read_ratio", error_ratio_)) error_ratio_ =  100;
