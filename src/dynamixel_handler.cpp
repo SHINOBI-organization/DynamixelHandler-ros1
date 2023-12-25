@@ -1,23 +1,6 @@
 #include "dynamixel_handler.hpp"
 
-// ここら変の情報は型番固有の情報なので， dynamixel_parameter.hpp/cpp側に記述して，将来的には自動で読み込ませるようにしたい．
-// int64_t deg2pulse(double deg) { return deg * 4096.0 / 360.0 + 2048; }
-// double  pulse2deg(int64_t pulse) { return (pulse - 2048 ) * 360.0 / 4096.0; }
-int64_t rad2pulse(double rad) { return rad * 4096.0 / (2.0 * M_PI) + 2048; }
-// int64_t mA2pulse(double mA) { return mA / 1.0; }
-// double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
-
-ros::Subscriber DynamixelHandler::sub_cmd_;
-bool DynamixelHandler::varbose_;
-int DynamixelHandler::loop_rate_;
-int DynamixelHandler::error_ratio_;
-DynamixelComunicator DynamixelHandler::dyn_comm_;
-vector<uint8_t> DynamixelHandler::id_list_x_;
-vector<uint8_t> DynamixelHandler::id_list_p_;
-vector<DynamixelHandler::Dynamixel> DynamixelHandler::dynamixel_chain;
-bool DynamixelHandler::is_updated;
-bool DynamixelHandler::has_hardware_error;
-
+// 各シリーズのDynamixelを検出する．
 bool DynamixelHandler::ScanDynamixels(uint8_t id_max) {   
     id_list_x_.clear();
     id_list_p_.clear();
@@ -30,9 +13,8 @@ bool DynamixelHandler::ScanDynamixels(uint8_t id_max) {
         }
         if (is_found) {
             auto dyn_model = dyn_comm_.Read(model_number, id);
-            id_list_x_.push_back(id); // とりあえず全てのサーボをx_seriesとして扱う
-            // if ( is_x_series(dyn_model) ) id_list_x_.push_back(id);
-            // if ( is_p_series(dyn_model) ) id_list_p_.push_back(id);
+            if ( is_x_series(dyn_model) ) id_list_x_.push_back(id);
+            if ( is_p_series(dyn_model) ) id_list_p_.push_back(id);
             printf(" * Servo id [%d] is found (id range 1 to [%d])\n", id, id_max);
         }
     }
@@ -41,7 +23,7 @@ bool DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 
 bool DynamixelHandler::ClearError(uint8_t id, DynamixelTorquePermission after_state){
     auto present_pos = dyn_comm_.Read(present_position, id);
-    int present_rotation = present_pos / 2048; // 整数値に丸める
+    int present_rotation = present_pos / 2048; // 整数値に丸める //todo ここら辺の変換を自動でやる必要がある
     if (present_pos < 0) present_rotation--;
 
         dyn_comm_.Reboot(id);
@@ -54,13 +36,13 @@ bool DynamixelHandler::ClearError(uint8_t id, DynamixelTorquePermission after_st
 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
     dyn_comm_.Write(torque_enable, id, TORQUE_ENABLE);
-    sleep_for(0.01s);
+    sleep_for(0.005s);
     return dyn_comm_.Read(torque_enable, id) != TORQUE_ENABLE;
 }
 
 bool DynamixelHandler::TorqueDisable(uint8_t id){
     dyn_comm_.Write(torque_enable, id, TORQUE_DISABLE);
-    sleep_for(0.01s);
+    sleep_for(0.005s);
     return dyn_comm_.Read(torque_enable, id) != TORQUE_DISABLE;
 }
 
@@ -81,7 +63,7 @@ bool DynamixelHandler::SyncReadPosition(){
             if ( id_data_map.find(id) == id_data_map.end() )
                 ROS_WARN("  * servo id [%d] failed to read", id);
     }
-    // 読み込んだデータをdynamixel_chainに反映
+    // 読み込みに成功したデータをdynamixel_chainに反映
     for (auto id_pos : id_data_map) dynamixel_chain[id_pos.first].present_position = id_pos.second; 
     return id_data_map.size()>0; // 1つでも成功したら成功とする.
 }
@@ -133,12 +115,3 @@ void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::Dynam
         }
     }
 }
-
-
-    // DynamixelのBaudrateを1Mに変更するするときに使った．
-    // dyn_comm_.Write(6, baudrate_x, BAUDRATE_INDEX_1M);
-    // dyn_comm_.ClosePort();
-    // dyn_comm_.set_baudrate(1000000);
-    // dyn_comm_.OpenPort();
-
-

@@ -23,57 +23,25 @@ using namespace dyn_x; // 一旦すべてのサーボをx_seriesとして扱う
 
 class DynamixelHandler {
     public:
-        static void Initialize(string device_name, int baudrate, bool varbose, int id_max ,int loop_rate, int error_ratio) {   
-            dyn_comm_ = DynamixelComunicator(device_name.c_str(), baudrate);
-            varbose_     = varbose;
-            loop_rate_   = loop_rate;
-            error_ratio_ = error_ratio;
-            is_updated   = false;
-            has_hardware_error = false;
-
-            ros::NodeHandle nh;
-            sub_cmd_ = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackOfDynamixelCommand);
-
-            // 通信の開始
-            dyn_comm_.OpenPort();
-
-            // id_listの作成
-            ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
-            bool any_found = ScanDynamixels(id_max);
-            if( !any_found ) ROS_ERROR("Dynamicel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
-
-            // プログラム内部の変数であるdynamixel_chainの初期化
-            dynamixel_chain.resize(id_max);
-            std::fill(dynamixel_chain.begin(), dynamixel_chain.end(), Dynamixel{0,0});
-            for (auto id : id_list_x_) {
-                dynamixel_chain[id].present_position = dyn_comm_.Read(present_position, id); // エラー時は0
-                dynamixel_chain[id].goal_position    = dyn_comm_.Read(goal_position, id);    // エラー時は0
-            }
-
-            // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
-            for (auto id : id_list_x_) {
-                if ( TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
-                dyn_comm_.Write(torque_enable, id, TORQUE_DISABLE);
-                dyn_comm_.Write(operating_mode, id, OPERATING_MODE_EXTENDED_POSITION);  
-                dyn_comm_.Write(profile_acceleration, id, 500); // 0~32767 数字は適当
-                dyn_comm_.Write(profile_velocity, id, 100); // 0~32767 数字は適当
-                int present_pos = dyn_comm_.Read(present_position, id);
-                dyn_comm_.Write(goal_position, id, present_pos);
-                bool is_hardware_error = dyn_comm_.Read(hardware_error_status, id); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-                if (is_hardware_error) ClearError(id, TORQUE_DISABLE);
-                if ( TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
-            }
-        }
-
-        // callback関数
+        //* ROS 初期設定とメインループ
+        static bool Initialize();
+        static void MainLoop();
+        //* ROS subscliber callback関数
         static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg);
-        // Dynamixelとの通信を超えた機能
+        // static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg);　//todo control 方式ごとにコマンドを分ける
+        //* ROS publisher publisher instance
+        static inline ros::Publisher  pub_dyn_state_;
+        static inline ros::Subscriber sub_cmd_;
+        // static ros::Publisher  pub_dyn_state_; //todo いくつかのデフォルトを用意しておく
+
+    private:
+        //* Dynamixelとの通信を超えた機能
         static bool ScanDynamixels(uint8_t id_max);
-        // Dynamixel単体との通信の組み合わせ
+        //* Dynamixel単体との通信の組み合わせ
         static bool ClearError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
         static bool TorqueEnable(uint8_t servo_id);
         static bool TorqueDisable(uint8_t servo_id);
-        // Sync系，Dynamixel複数との通信の組み合わせ
+        //* Sync系，Dynamixel複数との通信の組み合わせ
         static void SyncWritePosition();
         static void SyncReadHardwareError();
         static bool SyncReadPosition();
@@ -83,22 +51,29 @@ class DynamixelHandler {
             int32_t goal_position;
             int32_t present_position;
         };
-        // ROS関係
-        static ros::Subscriber sub_cmd_;
-        // main loop 内で使う // ROS1の実装ではほぼ使わない
-        static bool        varbose_;
-        static int         loop_rate_;
-        static int         error_ratio_;
+        // main loop 内で使う
+        static inline bool varbose_      = false;
+        static inline int  loop_rate_    = 50;
+        static inline int  error_ratio_  = 100;
         // Dynamixelとの通信
-        static DynamixelComunicator dyn_comm_;
+        static inline DynamixelComunicator dyn_comm_;
         // 連結しているDynamixelの情報
-        static vector<uint8_t> id_list_p_; // dynamixel pro series
-        static vector<uint8_t> id_list_x_; // dynamixel x series
-        static vector<Dynamixel> dynamixel_chain;
+        static inline vector<uint8_t> id_list_p_; // dynamixel pro series
+        static inline vector<uint8_t> id_list_x_; // dynamixel x series
+        static inline vector<Dynamixel> dynamixel_chain;
         // その他フラグ系
-        static bool is_updated;
-        static bool has_hardware_error;
+        static inline bool is_updated = false;
+        static inline bool has_hardware_error = false;
 };
+
+
+// ここら変の情報は型番固有の情報なので， dynamixel_parameter.hpp/cpp側に記述して，将来的には自動で読み込ませるようにしたい．
+// int64_t deg2pulse(double deg) { return deg * 4096.0 / 360.0 + 2048; }
+// double  pulse2deg(int64_t pulse) { return (pulse - 2048 ) * 360.0 / 4096.0; }
+static int64_t rad2pulse(double rad) { return rad * 4096.0 / (2.0 * M_PI) + 2048; }
+static double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0; } // tmp
+// int64_t mA2pulse(double mA) { return mA / 1.0; }
+// double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
 
 
 #endif /* DYNAMIXEL_HANDLER_H_ */
