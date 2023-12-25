@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(dynamixel_handler)
 
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
 
@@ -154,7 +157,6 @@ include_directories(
 add_executable(dynamixel_handler_node 
 	include/mylib_dynamixel/download/port_handler_linux.cpp
 	include/mylib_dynamixel/download/port_handler.cpp
-	include/mylib_dynamixel/src/dynamixel_parameters.cpp
 	include/mylib_dynamixel/src/dynamixel_communicator.cpp
 	
 	src/dynamixel_handler.cpp
