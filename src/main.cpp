@@ -46,8 +46,6 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("error_read_ratio", error_ratio_)) error_ratio_ =  100;
 
     // プログラム内部の変数であるdynamixel_chainの初期化
-    dynamixel_chain.resize(id_max);
-    std::fill(dynamixel_chain.begin(), dynamixel_chain.end(), Dynamixel{0,0});
     for (auto id : id_list_x_) {
         dynamixel_chain[id].present_position = dyn_comm_.Read(present_position, id); // エラー時は0
         dynamixel_chain[id].goal_position    = dyn_comm_.Read(goal_position, id);    // エラー時は0
@@ -56,14 +54,12 @@ bool DynamixelHandler::Initialize(){
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list_x_) {
         if ( TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
-        dyn_comm_.Write(torque_enable, id, TORQUE_DISABLE);
-        dyn_comm_.Write(operating_mode, id, OPERATING_MODE_EXTENDED_POSITION);  
-        dyn_comm_.Write(profile_acceleration, id, 500); // 0~32767 数字は適当
-        dyn_comm_.Write(profile_velocity, id, 100); // 0~32767 数字は適当
-        int present_pos = dyn_comm_.Read(present_position, id);
-        dyn_comm_.Write(goal_position, id, present_pos);
-        bool is_hardware_error = dyn_comm_.Read(hardware_error_status, id); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-        if (is_hardware_error) ClearError(id, TORQUE_DISABLE);
+        // 以下は適当，あとでちゃんと書く
+        dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_EXTENDED_POSITION);  
+        dyn_comm_.tryWrite(profile_acceleration, id, 500); // 0~32767 数字は適当
+        dyn_comm_.tryWrite(profile_velocity, id, 100); // 0~32767 数字は適当
+        dyn_comm_.tryWrite(homing_offset, id, 0);
+        if ( CheckHardwareError(id) ) ClearHardwareError(id, TORQUE_DISABLE); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
         if ( TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
     }
     return true;
@@ -73,7 +69,7 @@ void DynamixelHandler::MainLoop(){
     static int cnt = 0;
     static ros::Rate rate(loop_rate_);
 
-    if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError(); cnt=0;
+    if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError();
 
     // Dynamixelから現在角をRead & topicをPublish
     bool is_success = SyncReadPosition();
@@ -96,10 +92,10 @@ void DynamixelHandler::MainLoop(){
     // topicをSubscribe & Dynamixelへ目標角をWrite
     ros::spinOnce();
     rate.sleep();
-    if( is_updated ) {
+    // if( is_updated ) {
         SyncWritePosition();
         is_updated = false;
-    } 
+    // } 
 }
 
 int main(int argc, char **argv) {

@@ -1,49 +1,64 @@
 #include "dynamixel_handler.hpp"
 
 // 各シリーズのDynamixelを検出する．
-uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max, uint8_t num_try, uint8_t wait_time_ms) {   
+uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {   
     id_list_x_.clear();
     id_list_p_.clear();
 
     for (int id = 0; id <= id_max; id++) {
         if ( !dyn_comm_.tryPing(id) ) continue;
         int dyn_model = dyn_comm_.tryRead(model_number, id);
-            if ( is_x_series(dyn_model) ) { 
-                ROS_INFO(" * X series servo id [%d] is found", id);
+        if ( is_x_series(dyn_model) ) { 
+            ROS_INFO(" * X series servo id [%d] is found", id);
             id_list_x_.push_back(id); // 見つかったid残りの検査をスキップ
-            } else if ( is_p_series(dyn_model) ) { 
-                ROS_INFO(" * P series servo id [%d] is found", id);
+        } else if ( is_p_series(dyn_model) ) { 
+            ROS_INFO(" * P series servo id [%d] is found", id);
             id_list_p_.push_back(id); // 見つかったid残りの検査をスキップ
-            } else { 
-                ROS_WARN(" * Unkwon model [%d] servo id [%d] is found", dyn_model, id);
+        } else { 
+            ROS_WARN(" * Unkwon model [%d] servo id [%d] is found", dyn_model, id);
         }
     }
     return id_list_x_.size() + id_list_p_.size();
 }
 
-bool DynamixelHandler::ClearError(uint8_t id, DynamixelTorquePermission after_state){
-    auto present_pos = dyn_comm_.Read(present_position, id);
-    int present_rotation = present_pos / 2048; // 整数値に丸める //todo ここら辺の変換を自動でやる必要がある
+bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after_state){
+    auto present_pos = dyn_comm_.tryRead(present_position, id);
+    int present_rotation = present_pos / rad2pulse(M_PI); // 整数値に丸める //todo ここら辺の変換を自動でやる必要がある
     if (present_pos < 0) present_rotation--;
 
-        dyn_comm_.Reboot(id);
-        sleep_for(0.5s);
+    dyn_comm_.Reboot(id);
+    sleep_for(0.5s);
 
-    dyn_comm_.Write(homing_offset, id, present_rotation * 2048);
-    dyn_comm_.Write(torque_enable, id, after_state);
-    return dyn_comm_.Read(hardware_error_status, id) == 0; // 0 is no error
+    dyn_comm_.tryWrite(homing_offset, id, present_rotation * rad2pulse(M_PI));
+    after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
+
+    if (dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000) {
+        ROS_INFO("Servo id [%d] is cleared error", id);
+        return true;
+    } else {
+        ROS_ERROR("Servo id [%d] failed to clear error", id);
+        return false;
+    }
 }
 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
-    dyn_comm_.Write(torque_enable, id, TORQUE_ENABLE);
-    sleep_for(0.005s);
-    return dyn_comm_.Read(torque_enable, id) != TORQUE_ENABLE;
+    // 角度の同期
+    int present_pos = dyn_comm_.tryRead(present_position, id);
+    dynamixel_chain[id].present_position = present_pos;
+    dynamixel_chain[id].goal_position    = present_pos;
+    dyn_comm_.tryWrite(goal_position, id, present_pos);
+    // トルクオン
+    dyn_comm_.tryWrite(torque_enable, id, TORQUE_ENABLE);
+    return dyn_comm_.tryRead(torque_enable, id) != TORQUE_ENABLE;
 }
 
 bool DynamixelHandler::TorqueDisable(uint8_t id){
-    dyn_comm_.Write(torque_enable, id, TORQUE_DISABLE);
-    sleep_for(0.005s);
-    return dyn_comm_.Read(torque_enable, id) != TORQUE_DISABLE;
+    dyn_comm_.tryWrite(torque_enable, id, TORQUE_DISABLE);
+    return dyn_comm_.tryRead(torque_enable, id) != TORQUE_DISABLE;
+}
+
+bool DynamixelHandler::CheckHardwareError(uint8_t id){
+    return dyn_comm_.tryRead(hardware_error_status, id); //todo dyn_comm_にエラー簡易的なHWエラー判定を実装する
 }
 
 void DynamixelHandler::SyncWritePosition(){
@@ -93,17 +108,17 @@ void DynamixelHandler::SyncReadHardwareError(){
 void DynamixelHandler::ShowDynamixelChain(){
     // dynamixel_chainのすべての内容を表示
     for (auto id : id_list_x_) {
-        ROS_INFO("== Servo id [%d] ==", id);
-        ROS_INFO("  present_position [%d] pulse", dynamixel_chain[id].present_position);
-        ROS_INFO("  goal_position    [%d] pulse", dynamixel_chain[id].goal_position);
+        ROS_INFO("== Servo id [%d] ==", (int)id);
+        ROS_INFO("  present_position [%d] pulse", (int)dynamixel_chain[id].present_position);
+        ROS_INFO("  goal_position    [%d] pulse", (int)dynamixel_chain[id].goal_position);
     }
 }
 
 void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
     if (msg.command == "show") ShowDynamixelChain();
     if (msg.command == "reboot") { 
-        for (auto id : msg.ids) ClearError(id);
-        if (msg.ids.size() == 0) for (auto id : id_list_x_) ClearError(id);
+        for (auto id : msg.ids) ClearHardwareError(id);
+        if (msg.ids.size() == 0) for (auto id : id_list_x_) ClearHardwareError(id);
     }
     if (msg.command == "write") {
         if( msg.goal_angles.size() == msg.ids.size()) {
