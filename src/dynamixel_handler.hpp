@@ -12,6 +12,7 @@
 #include <dynamixel_handler/DynamixelCmd_X_ControlCurrentPosition.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlExtendedPosition.h>
 #include <dynamixel_handler/DynamixelState.h>
+#include <dynamixel_handler/DynamixelState_Dynamic.h>
 
 #include <thread>
 using std::this_thread::sleep_for;
@@ -36,6 +37,7 @@ class DynamixelHandler {
         static bool Initialize();
         static void MainLoop();
         //* ROS subscliber callback関数
+        static void BroadcastDynamixelState_Dynamic();
         static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg);
         static void CallBackOfDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
         static void CallBackOfDxlCmd_X_Velocity        (const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg);
@@ -85,19 +87,23 @@ class DynamixelHandler {
             PRESENT_CURRENT      = 1,
             PRESENT_VELOCITY     = 2,
             PRESENT_POSITION     = 3,
+            VELOCITY_TRAJECTORY  = 4,
+            POSITION_TRAJECTORY  = 5,
+            PRESENT_INPUT_VOLTAGE= 6,
+            PRESENT_TEMPERTURE   = 7,
         };
         static inline map<uint8_t, bool> is_updated_; // cakkbackによって，cmd_valuesが更新されたかどうか．
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // コマンドとして定義した，サーボに書き込む値
-        static inline map<uint8_t, array<double, 4>> state_values_;// ステータスとして定義した．サーボから読み取った値
-        static inline pair<int, int> range_updated_cmd_val_ = {GOAL_POSITION,    GOAL_PWM};
-        static inline pair<int, int> range_read_state_val_  = {PRESENT_POSITION, PRESENT_PWM};
+        static inline map<uint8_t, array<double, 8>> state_values_;// ステータスとして定義した．サーボから読み取った値
+        static inline pair<CmdValues,  CmdValues>   range_write_ = {GOAL_POSITION,    GOAL_PWM};
+        static inline pair<StateValues,StateValues> range_read_  = {PRESENT_POSITION, PRESENT_PWM};
         //* cmd_vals と state_vals の更新
-        static void SyncWriteCmdValues();
+        // static void SyncWriteCmdValues();
         static void SyncWriteCmdValues(CmdValues target);
-        static void SyncWriteCmdValues(uint8_t start, uint8_t end);
-        static bool SyncReadStateValues();
+        static void SyncWriteCmdValues(pair<CmdValues, CmdValues> range=range_write_);
+        // static bool SyncReadStateValues();
         static bool SyncReadStateValues(StateValues target);
-        static bool SyncReadStateValues(uint8_t start, uint8_t end);
+        static bool SyncReadStateValues(pair<StateValues, StateValues> range=range_read_);
 
         // その他
         static inline bool has_hardware_error = false;
@@ -105,18 +111,22 @@ class DynamixelHandler {
 
 namespace dyn_x{
 const static vector<DynamixelAddress> cmd_dp_list = { // この順序が大事
-        goal_pwm,
-        goal_current,
-        goal_velocity,
+        goal_pwm            ,
+        goal_current        ,
+        goal_velocity       ,
         profile_acceleration,
-        profile_velocity,
-        goal_position
+        profile_velocity    ,
+        goal_position       
     };
 const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_pwm, 
         present_current, 
         present_velocity, 
-        present_position 
+        present_position,
+        velocity_trajectory,   
+        position_trajectory,  
+        present_input_voltage, 
+        present_temperture    
     }; 
 } // namespace dyn_x
 
@@ -133,7 +143,11 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_pwm, 
         present_current, 
         present_velocity, 
-        present_position 
+        present_position,
+        velocity_trajectory,   
+        position_trajectory,  
+        present_input_voltage, 
+        present_temperture    
     }; 
 } // namespace dyn_p
 

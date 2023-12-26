@@ -104,8 +104,8 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Position(const dynamixel_handler::Dyna
         auto pos = msg.position__deg[i];
         cmd_values_[id][GOAL_POSITION] = pos;
         is_updated_[id] = true;
-        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_POSITION);
-        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_POSITION);
+        range_write_.first  = min(range_write_.first,  GOAL_POSITION);
+        range_write_.second = max(range_write_.second, GOAL_POSITION);
     }
 }
 
@@ -117,8 +117,8 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::Dyna
         auto vel = msg.velocity__deg_s[i];
         cmd_values_[id][GOAL_VOLOCITY] = vel;
         is_updated_[id] = true;
-        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_VOLOCITY);
-        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_VOLOCITY);
+        range_write_.first  = min(range_write_.first,  GOAL_VOLOCITY);
+        range_write_.second = max(range_write_.second, GOAL_VOLOCITY);
     }
 }
 
@@ -130,8 +130,8 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::Dynam
         auto cur = msg.current__mA[i];
         cmd_values_[id][GOAL_CURRENT] = cur;
         is_updated_[id] = true;
-        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_CURRENT);
-        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_CURRENT);
+        range_write_.first  = min(range_write_.first,  GOAL_CURRENT);
+        range_write_.second = max(range_write_.second, GOAL_CURRENT);
     }
 }
 
@@ -147,15 +147,15 @@ void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handle
             auto rot = !msg.rotation.empty()      ? msg.rotation[i]     : 0;
             is_updated_[id] = true;
             cmd_values_[id][GOAL_POSITION] = pos + rot * 360.0;
-            range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_POSITION);
-            range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_POSITION);
+            range_write_.first  = min(range_write_.first,  GOAL_POSITION);
+            range_write_.second = max(range_write_.second, GOAL_POSITION);
         }
         if (!msg.current__mA.empty()){
             auto cur = msg.current__mA[i];
             is_updated_[id] = true;
             cmd_values_[id][GOAL_CURRENT] = cur;
-            range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_CURRENT);
-            range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_CURRENT);
+            range_write_.first  = min(range_write_.first,  GOAL_CURRENT);
+            range_write_.second = max(range_write_.second, GOAL_CURRENT);            
         }
     }
 }
@@ -168,9 +168,10 @@ void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handl
         int id = msg.id_list[i];
         auto pos = !msg.position__deg.empty() ? msg.position__deg[i] : cmd_values_[id][GOAL_POSITION] ;
         auto rot = !msg.rotation.empty()      ? msg.rotation[i]     : 0;
+        is_updated_[id] = true;
         cmd_values_[id][GOAL_POSITION] = pos + rot * 360.0;
-        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_POSITION);
-        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_POSITION);
+        range_write_.first  = min(range_write_.first,  GOAL_POSITION);
+        range_write_.second = max(range_write_.second, GOAL_POSITION);
     }
 }
 
@@ -180,7 +181,9 @@ void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handl
  * @param start 書き込み開始 dynamixel address インスタンス
  * @param end   書き込み終了 dynamixel address インスタンス
 */
-void DynamixelHandler::SyncWriteCmdValues(uint8_t start, uint8_t end){
+void DynamixelHandler::SyncWriteCmdValues(pair<CmdValues, CmdValues> write_range){
+    const auto start = write_range.first;
+    const auto end   = write_range.second+1;
     if ( !(0 <= start && start < end && end <= cmd_dp_list.size()) ) return;
 
     vector<DynamixelAddress> target_cmd_dp_list(
@@ -190,28 +193,22 @@ void DynamixelHandler::SyncWriteCmdValues(uint8_t start, uint8_t end){
     for (int id : id_list_x_) if ( is_updated_[id] ) {
         is_updated_[id] = false; // 更新済みフラグをリセット
         // 書き込むデータをCmdValuesの範囲を基に切り出す
-    	vector<int64_t> data_int_list( 
+    	vector<int64_t> data_int_list( // todo DynamixelAdderessの情報に合わせて， double -> int64_t に変換する
             cmd_values_[id].begin()+start, cmd_values_[id].begin()+end );
         id_data_int_map[id] = data_int_list;
     }
     // データの確認
-    for (auto pair : id_data_int_map) {
-        uint8_t id = pair.first;
-        vector<int64_t> data_int_list = pair.second;
-        ROS_INFO("Servo id [%d] : ", id);
-        for (auto data_int : data_int_list) ROS_INFO("  %d", (int)data_int);
-    }
+    // for (auto pair : id_data_int_map) {
+    //     uint8_t id = pair.first;
+    //     vector<int64_t> data_int_list = pair.second;
+    //     ROS_INFO("Servo id [%d] : ", id);
+    //     for (auto data_int : data_int_list) ROS_INFO("  %d", data_int);
+    // }
     // dyn_comm_.SyncWrite(target_cmd_dp_list, id_data_int_map);
 }
 
 void DynamixelHandler::SyncWriteCmdValues(CmdValues target){
-    SyncWriteCmdValues(target, target+1);
-}
-
-void DynamixelHandler::SyncWriteCmdValues(){
-    const int start = range_updated_cmd_val_.first;
-    const int end   = range_updated_cmd_val_.second+1;
-    SyncWriteCmdValues(start, end);
+    SyncWriteCmdValues({target, target});
 }
 
 /**
@@ -221,7 +218,9 @@ void DynamixelHandler::SyncWriteCmdValues(){
  * @param end   読み込み終了 dynamixel address インスタンス
  * @return 読み込みに成功したかどうか
 */
-bool DynamixelHandler::SyncReadStateValues(uint8_t start, uint8_t end){
+bool DynamixelHandler::SyncReadStateValues(pair<StateValues, StateValues> read_range){
+    const auto start = read_range.first;
+    const auto end   = read_range.second+1;
     if ( !(0 <= start && start < end && end <= state_dp_list.size()) ) return false;
 
     vector<DynamixelAddress> target_state_dp_list(
@@ -244,7 +243,7 @@ bool DynamixelHandler::SyncReadStateValues(uint8_t start, uint8_t end){
     // }
 
     // for (auto id_pos : id_data_map) {
-    //     int id = id_pos.first;
+    //     int id = id_pos.first;  // todo DynamixelAdderessの情報に合わせて， double -> int64_t に変換する
     //     for (int i = 0; i < id_pos.second.size(); i++) 
     //         state_vals[id][start+i] = id_pos.second[i];
     // }
@@ -252,12 +251,32 @@ bool DynamixelHandler::SyncReadStateValues(uint8_t start, uint8_t end){
     // return id_data_map.size()>0; // 1つでも成功したら成功とする.
 }
 
-bool DynamixelHandler::SyncReadStateValues(){
-    const auto start = range_read_state_val_.first;
-    const auto end   = range_read_state_val_.second+1;
-    return SyncReadStateValues(start, end);
+bool DynamixelHandler::SyncReadStateValues(StateValues target){
+    return SyncReadStateValues({target, target});
 }
 
-bool DynamixelHandler::SyncReadStateValues(StateValues target){
-    return SyncReadStateValues(target, target+1);
+void DynamixelHandler::BroadcastDynamixelState_Dynamic(){
+    const auto start = range_read_.first;
+    const auto end   = range_read_.second+1;
+    if ( !(0 <= start && start < end && end <= state_dp_list.size()) ) return;
+
+    dynamixel_handler::DynamixelState_Dynamic msg;
+    for (auto id : id_list_x_) {
+        msg.id_list.push_back(id);
+        if( start<=PRESENT_CURRENT       && PRESENT_CURRENT      <end)
+            msg.current__mA.push_back(state_values_[id][PRESENT_CURRENT]);
+        if( start<=PRESENT_VELOCITY      && PRESENT_VELOCITY     <end)
+            msg.velocity__deg_s.push_back(state_values_[id][PRESENT_VELOCITY]);
+        if( start<=PRESENT_POSITION      && PRESENT_POSITION     <end)
+            msg.position__deg.push_back(state_values_[id][PRESENT_POSITION]);
+        if( start<=VELOCITY_TRAJECTORY   && VELOCITY_TRAJECTORY  <end)
+            msg.velocity_trajectory__deg_s.push_back(state_values_[id][VELOCITY_TRAJECTORY]);
+        if( start<=POSITION_TRAJECTORY   && POSITION_TRAJECTORY  <end)
+            msg.position_trajectory__deg.push_back(state_values_[id][POSITION_TRAJECTORY]);
+        if( start<=PRESENT_TEMPERTURE    && PRESENT_TEMPERTURE   <end)
+            msg.temperature__degC.push_back(state_values_[id][PRESENT_TEMPERTURE]);
+        if( start<=PRESENT_INPUT_VOLTAGE && PRESENT_INPUT_VOLTAGE<end)
+            msg.input_voltage__V.push_back(state_values_[id][PRESENT_INPUT_VOLTAGE]);
+    }
+    pub_dyn_state_.publish(msg);
 }

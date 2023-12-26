@@ -55,20 +55,16 @@ bool DynamixelHandler::Initialize(){
 
     //  readする情報の設定
     // todo rosparamで設定できるようにする
-    range_read_state_val_ = {PRESENT_CURRENT, PRESENT_POSITION};
+    range_read_ = {PRESENT_CURRENT, PRESENT_POSITION};
 
     // 内部の情報の初期化
     for (auto id : id_list_x_) {
-        state_values_[id][PRESENT_PWM]      = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_PWM]     , id); // エラー時は0
-        state_values_[id][PRESENT_CURRENT]  = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_CURRENT] , id); // エラー時は0
-        state_values_[id][PRESENT_VELOCITY] = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_VELOCITY], id); // エラー時は0
-        state_values_[id][PRESENT_POSITION] = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_POSITION], id); // エラー時は0
-        cmd_values_[id][GOAL_PWM]             = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_PWM]            , id);    // エラー時は0
-        cmd_values_[id][GOAL_CURRENT]         = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_CURRENT]        , id);    // エラー時は0
-        cmd_values_[id][GOAL_VOLOCITY]        = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_VOLOCITY]       , id);    // エラー時は0
-        cmd_values_[id][PROFILE_ACCELERATION] = dyn_comm_.tryRead(dyn_x::cmd_dp_list[PROFILE_ACCELERATION], id);    // エラー時は0
-        cmd_values_[id][PROFILE_VELOCITY]     = dyn_comm_.tryRead(dyn_x::cmd_dp_list[PROFILE_VELOCITY]    , id);    // エラー時は0
-        cmd_values_[id][GOAL_POSITION]        = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_POSITION]       , id);    // エラー時は0
+        cmd_values_[id][GOAL_PWM]             = dyn_comm_.tryRead(dyn_x::goal_pwm            , id);    // エラー時は0
+        cmd_values_[id][GOAL_CURRENT]         = dyn_comm_.tryRead(dyn_x::goal_current        , id);    // エラー時は0
+        cmd_values_[id][GOAL_VOLOCITY]        = dyn_comm_.tryRead(dyn_x::goal_velocity       , id);    // エラー時は0
+        cmd_values_[id][PROFILE_ACCELERATION] = dyn_comm_.tryRead(dyn_x::profile_acceleration, id);    // エラー時は0
+        cmd_values_[id][PROFILE_VELOCITY]     = dyn_comm_.tryRead(dyn_x::profile_velocity    , id);    // エラー時は0
+        cmd_values_[id][GOAL_POSITION]        = dyn_comm_.tryRead(dyn_x::goal_position       , id);    // エラー時は0
     }
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
