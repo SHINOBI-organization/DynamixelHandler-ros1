@@ -1,4 +1,4 @@
-****# DynamixelHandler-ros1
+# DynamixelHandler-ros1
 
 Robotis社の[Dynamixel](https://e-shop.robotis.co.jp/list.php?c_id=89)をROSから制御するための ros pkg `dynamixel_handler`を提供するリポジトリ.  
 
