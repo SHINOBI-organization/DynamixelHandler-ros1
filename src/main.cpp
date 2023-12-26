@@ -1,12 +1,20 @@
 #include <ros/ros.h>
 #include "dynamixel_handler.hpp"
 
+using namespace dyn_x;
+
 bool DynamixelHandler::Initialize(){
     ros::NodeHandle nh;
     ros::NodeHandle nh_p("~");
 
     // Subscriber / Publisherの設定
-    sub_cmd_ = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackOfDynamixelCommand);
+    cmd_free_  = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackOfDynamixelCommand);
+    cmd_x_pos_ = nh.subscribe("/dynamixel/x_cmd/position", 10, DynamixelHandler::CallBackOfDxlCmd_X_Position);
+    cmd_x_vel_ = nh.subscribe("/dynamixel/x_cmd/velocity", 10, DynamixelHandler::CallBackOfDxlCmd_X_Velocity);
+    cmd_x_cur_ = nh.subscribe("/dynamixel/x_cmd/current",  10, DynamixelHandler::CallBackOfDxlCmd_X_Current);
+    cmd_x_cpos_ = nh.subscribe("/dynamixel/x_cmd/current_position",  10, DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition);
+    cmd_x_epos_ = nh.subscribe("/dynamixel/cx_md/extended_position", 10, DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition);
+
     pub_dyn_state_ = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
 
     // 通信の開始
@@ -45,17 +53,29 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("loop_rate",        loop_rate_  )) loop_rate_   =  50;
     if (!nh_p.getParam("error_read_ratio", error_ratio_)) error_ratio_ =  100;
 
-    // プログラム内部の変数であるdynamixel_chainの初期化
+    //  readする情報の設定
+    // todo rosparamで設定できるようにする
+    range_read_state_val_ = {PRESENT_CURRENT, PRESENT_POSITION};
+
+    // 内部の情報の初期化
     for (auto id : id_list_x_) {
-        dynamixel_chain[id].present_position = dyn_comm_.Read(present_position, id); // エラー時は0
-        dynamixel_chain[id].goal_position    = dyn_comm_.Read(goal_position, id);    // エラー時は0
+        state_values_[id][PRESENT_PWM]      = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_PWM]     , id); // エラー時は0
+        state_values_[id][PRESENT_CURRENT]  = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_CURRENT] , id); // エラー時は0
+        state_values_[id][PRESENT_VELOCITY] = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_VELOCITY], id); // エラー時は0
+        state_values_[id][PRESENT_POSITION] = dyn_comm_.tryRead(dyn_x::state_dp_list[PRESENT_POSITION], id); // エラー時は0
+        cmd_values_[id][GOAL_PWM]             = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_PWM]            , id);    // エラー時は0
+        cmd_values_[id][GOAL_CURRENT]         = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_CURRENT]        , id);    // エラー時は0
+        cmd_values_[id][GOAL_VOLOCITY]        = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_VOLOCITY]       , id);    // エラー時は0
+        cmd_values_[id][PROFILE_ACCELERATION] = dyn_comm_.tryRead(dyn_x::cmd_dp_list[PROFILE_ACCELERATION], id);    // エラー時は0
+        cmd_values_[id][PROFILE_VELOCITY]     = dyn_comm_.tryRead(dyn_x::cmd_dp_list[PROFILE_VELOCITY]    , id);    // エラー時は0
+        cmd_values_[id][GOAL_POSITION]        = dyn_comm_.tryRead(dyn_x::cmd_dp_list[GOAL_POSITION]       , id);    // エラー時は0
     }
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list_x_) {
         if ( TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
         // 以下は適当，あとでちゃんと書く
-        dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_EXTENDED_POSITION);  
+        dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION);  
         dyn_comm_.tryWrite(profile_acceleration, id, 500); // 0~32767 数字は適当
         dyn_comm_.tryWrite(profile_velocity, id, 100); // 0~32767 数字は適当
         dyn_comm_.tryWrite(homing_offset, id, 0);
@@ -72,30 +92,27 @@ void DynamixelHandler::MainLoop(){
     if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError();
 
     // Dynamixelから現在角をRead & topicをPublish
-    bool is_success = SyncReadPosition();
+    bool is_success = SyncReadStateValues();
     if ( is_success ) {
-        dynamixel_handler::DynamixelState msg;
-        msg.ids.resize(id_list_x_.size());
-        msg.present_angles.resize(id_list_x_.size());
-        msg.goal_angles.resize(id_list_x_.size());
-        for (size_t i = 0; i < id_list_x_.size(); i++) {
-            msg.ids[i] = id_list_x_[i];
-            msg.present_angles[i] = pulse2rad(dynamixel_chain[id_list_x_[i]].present_position);
-            msg.goal_angles[i]    = pulse2rad(dynamixel_chain[id_list_x_[i]].goal_position);
-        }
-        pub_dyn_state_.publish(msg);
+        // dynamixel_handler::DynamixelState msg;
+        // msg.ids.resize(id_list_x_.size());
+        // msg.present_angles.resize(id_list_x_.size());
+        // msg.goal_angles.resize(id_list_x_.size());
+        // for (size_t i = 0; i < id_list_x_.size(); i++) {
+        //     msg.ids[i] = id_list_x_[i];
+        //     msg.present_angles[i] = pulse2rad(dynamixel_chain[id_list_x_[i]].present_position);
+        //     msg.goal_angles[i]    = pulse2rad(dynamixel_chain[id_list_x_[i]].goal_position);
+        // }
+        // pub_dyn_state_.publish(msg);
     }
 
     // デバック用
-    if (varbose_) ShowDynamixelChain();
+    // if (varbose_) ShowDynamixelChain();
 
     // topicをSubscribe & Dynamixelへ目標角をWrite
     ros::spinOnce();
     rate.sleep();
-    // if( is_updated ) {
-        SyncWritePosition();
-        is_updated = false;
-    // } 
+    SyncWriteCmdValues();
 }
 
 int main(int argc, char **argv) {

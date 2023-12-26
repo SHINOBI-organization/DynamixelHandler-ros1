@@ -52,8 +52,24 @@ find_package(catkin REQUIRED COMPONENTS
 ## Generate messages in the 'msg' folder
 add_message_files(
   FILES
+  
   DynamixelState.msg
+  DynamixelState_Dynamic.msg
+  DynamixelState_Static.msg
+
+  DynamixelCmdState_Gains.msg
+  DynamixelCmdState_Limits.msg
+  
   DynamixelCmd.msg
+  DynamixelCmd_X_ControlCurrent.msg
+  DynamixelCmd_X_ControlCurrentPosition.msg
+  DynamixelCmd_X_ControlExtendedPosition.msg
+  DynamixelCmd_X_ControlPosition.msg
+  DynamixelCmd_X_ControlVelocity.msg
+  DynamixelCmd_P_ControlCurrent.msg
+  DynamixelCmd_P_ControlExtendedPosition.msg
+  DynamixelCmd_P_ControlPosition.msg
+  DynamixelCmd_P_ControlVelocity.msg
 )
 
 ## Generate services in the 'srv' folder

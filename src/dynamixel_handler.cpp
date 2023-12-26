@@ -1,5 +1,7 @@
 #include "dynamixel_handler.hpp"
 
+using namespace dyn_x;
+
 // 各シリーズのDynamixelを検出する．
 uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {   
     id_list_x_.clear();
@@ -22,14 +24,14 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 }
 
 bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after_state){
-    auto present_pos = dyn_comm_.tryRead(present_position, id);
-    int present_rotation = present_pos / rad2pulse(M_PI); // 整数値に丸める //todo ここら辺の変換を自動でやる必要がある
+    auto present_pos = pulse2rad(dyn_comm_.tryRead(present_position, id)) ;
+    int present_rotation = present_pos / (2*M_PI); // 整数値に丸める //todo ここら辺の変換を自動でやる必要がある
     if (present_pos < 0) present_rotation--;
 
     dyn_comm_.Reboot(id);
     sleep_for(0.5s);
 
-    dyn_comm_.tryWrite(homing_offset, id, present_rotation * rad2pulse(M_PI));
+    dyn_comm_.tryWrite(homing_offset, id, rad2pulse((present_rotation * M_PI)));
     after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
 
     if (dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000) {
@@ -44,8 +46,8 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
     // 角度の同期
     int present_pos = dyn_comm_.tryRead(present_position, id);
-    dynamixel_chain[id].present_position = present_pos;
-    dynamixel_chain[id].goal_position    = present_pos;
+    cmd_values_[id][GOAL_POSITION]      = present_pos;
+    state_values_[id][PRESENT_POSITION] = present_pos;
     dyn_comm_.tryWrite(goal_position, id, present_pos);
     // トルクオン
     dyn_comm_.tryWrite(torque_enable, id, TORQUE_ENABLE);
@@ -61,36 +63,14 @@ bool DynamixelHandler::CheckHardwareError(uint8_t id){
     return dyn_comm_.tryRead(hardware_error_status, id); //todo dyn_comm_にエラー簡易的なHWエラー判定を実装する
 }
 
-void DynamixelHandler::SyncWritePosition(){
-    vector<int64_t> data_int_list(id_list_x_.size());
-    for (size_t i = 0; i < id_list_x_.size(); i++) data_int_list[i] = dynamixel_chain[id_list_x_[i]].goal_position;
-    dyn_comm_.SyncWrite(goal_position, id_list_x_, data_int_list);
-}
-
-bool DynamixelHandler::SyncReadPosition(){
-    auto id_data_map = (has_hardware_error)
-        ? dyn_comm_.SyncRead     (present_position, id_list_x_)  // エラーがあるときは遅い方
-        : dyn_comm_.SyncRead_fast(present_position, id_list_x_); // エラーがあるときは早い方
-    // エラー処理
-    if (id_data_map.size() < id_list_x_.size()){
-        ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(id_list_x_.size() - id_data_map.size()));
-        for ( auto id : id_list_x_ )
-            if ( id_data_map.find(id) == id_data_map.end() )
-                ROS_WARN("  * servo id [%d] failed to read", id);
-    }
-    // 読み込みに成功したデータをdynamixel_chainに反映
-    for (auto id_pos : id_data_map) dynamixel_chain[id_pos.first].present_position = id_pos.second; 
-    return id_data_map.size()>0; // 1つでも成功したら成功とする.
-}
-
-void DynamixelHandler::SyncReadHardwareError(){
+bool DynamixelHandler::SyncReadHardwareError(){
     ROS_INFO("SyncReadHardwareInfo: Checking hardware error");
     
     auto id_error_map = dyn_comm_.SyncRead(hardware_error_status, id_list_x_);
 
     has_hardware_error = false;
     for (auto pair : id_error_map) has_hardware_error += (bool)pair.second; // errorがあるときは0以外の値になる．
-    if ( !has_hardware_error ) return;
+    if ( !has_hardware_error ) return false;
 
     ROS_ERROR("SyncReadHardwareError: Hardware Error is detected");
     for (auto pair : id_error_map) {
@@ -103,30 +83,181 @@ void DynamixelHandler::SyncReadHardwareError(){
         if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) ROS_ERROR("  * servo id [%d] : ELECTRONICAL_SHOCK",id);
         if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERLOAD",          id);
     }
-}
-
-void DynamixelHandler::ShowDynamixelChain(){
-    // dynamixel_chainのすべての内容を表示
-    for (auto id : id_list_x_) {
-        ROS_INFO("== Servo id [%d] ==", (int)id);
-        ROS_INFO("  present_position [%d] pulse", (int)dynamixel_chain[id].present_position);
-        ROS_INFO("  goal_position    [%d] pulse", (int)dynamixel_chain[id].goal_position);
-    }
+    return true;
 }
 
 void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
-    if (msg.command == "show") ShowDynamixelChain();
-    if (msg.command == "reboot") { 
-        for (auto id : msg.ids) ClearHardwareError(id);
-        if (msg.ids.size() == 0) for (auto id : id_list_x_) ClearHardwareError(id);
+    // if (msg.command == "reboot") { 
+    //     for (auto id : msg.ids) ClearHardwareError(id);
+    //     if (msg.ids.size() == 0) for (auto id : id_list_x_) ClearHardwareError(id);
+    // }
+    // if (msg.command == "write") {
+
+    // }
+}
+
+void DynamixelHandler::CallBackOfDxlCmd_X_Position(const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg) {
+    if ( msg.id_list.size() != msg.position__deg.size() ) return;
+
+    for (int i = 0; i < msg.id_list.size(); i++) {
+        int id = msg.id_list[i];
+        auto pos = msg.position__deg[i];
+        cmd_values_[id][GOAL_POSITION] = pos;
+        is_updated_[id] = true;
+        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_POSITION);
+        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_POSITION);
     }
-    if (msg.command == "write") {
-        if( msg.goal_angles.size() == msg.ids.size()) {
-        for (int i = 0; i < msg.ids.size(); i++) {
-            int id = msg.ids[i];
-            dynamixel_chain[id].goal_position = rad2pulse(msg.goal_angles[i]);
+}
+
+void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg) {
+    if ( msg.id_list.size() != msg.velocity__deg_s.size() ) return;
+
+    for (int i = 0; i < msg.id_list.size(); i++) {
+        int id = msg.id_list[i];
+        auto vel = msg.velocity__deg_s[i];
+        cmd_values_[id][GOAL_VOLOCITY] = vel;
+        is_updated_[id] = true;
+        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_VOLOCITY);
+        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_VOLOCITY);
+    }
+}
+
+void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg) {
+    if ( msg.id_list.size() != msg.current__mA.size() ) return;
+
+    for (int i = 0; i < msg.id_list.size(); i++) {
+        int id = msg.id_list[i];
+        auto cur = msg.current__mA[i];
+        cmd_values_[id][GOAL_CURRENT] = cur;
+        is_updated_[id] = true;
+        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_CURRENT);
+        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_CURRENT);
+    }
+}
+
+void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg) {
+    if ( !msg.current__mA.empty()   && msg.id_list.size() != msg.current__mA.size()  ) return; // 空なら無視するのでOK, 空でないならサイズ一致が必要
+    if ( !msg.position__deg.empty() && msg.id_list.size() != msg.position__deg.size()) return; // なので，空でなくかつサイズ不一致はスキップする
+    if ( !msg.rotation.empty()      && msg.id_list.size() != msg.rotation.size()     ) return;
+
+    for (int i = 0; i < msg.id_list.size(); i++) {
+        int id = msg.id_list[i];
+        if (!msg.position__deg.empty() || !msg.rotation.empty()){
+            auto pos = !msg.position__deg.empty() ? msg.position__deg[i] : cmd_values_[id][GOAL_POSITION] ;
+            auto rot = !msg.rotation.empty()      ? msg.rotation[i]     : 0;
+            is_updated_[id] = true;
+            cmd_values_[id][GOAL_POSITION] = pos + rot * 360.0;
+            range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_POSITION);
+            range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_POSITION);
         }
-        is_updated = true;
+        if (!msg.current__mA.empty()){
+            auto cur = msg.current__mA[i];
+            is_updated_[id] = true;
+            cmd_values_[id][GOAL_CURRENT] = cur;
+            range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_CURRENT);
+            range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_CURRENT);
         }
     }
+}
+
+void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg) {
+    if ( !msg.position__deg.empty() && msg.id_list.size() != msg.position__deg.size()) return; // 空なら無視するのでOK, 空でないならサイズ一致が必要
+    if ( !msg.rotation.empty()     && msg.id_list.size() != msg.rotation.size()      ) return; // なので，空でなくかつサイズ不一致はスキップする
+
+    for (int i = 0; i < msg.id_list.size(); i++) {
+        int id = msg.id_list[i];
+        auto pos = !msg.position__deg.empty() ? msg.position__deg[i] : cmd_values_[id][GOAL_POSITION] ;
+        auto rot = !msg.rotation.empty()      ? msg.rotation[i]     : 0;
+        cmd_values_[id][GOAL_POSITION] = pos + rot * 360.0;
+        range_updated_cmd_val_.first  = min(range_updated_cmd_val_.first,  (int)GOAL_POSITION);
+        range_updated_cmd_val_.second = max(range_updated_cmd_val_.second, (int)GOAL_POSITION);
+    }
+}
+
+/**
+ * @func SyncWriteCmdValues
+ * @brief 指定した範囲のコマンド値を書き込む
+ * @param start 書き込み開始 dynamixel address インスタンス
+ * @param end   書き込み終了 dynamixel address インスタンス
+*/
+void DynamixelHandler::SyncWriteCmdValues(uint8_t start, uint8_t end){
+    if ( !(0 <= start && start < end && end <= cmd_dp_list.size()) ) return;
+
+    vector<DynamixelAddress> target_cmd_dp_list(
+         cmd_dp_list.begin()+start, cmd_dp_list.begin()+end );
+   
+    map<uint8_t, vector<int64_t>> id_data_int_map;
+    for (int id : id_list_x_) if ( is_updated_[id] ) {
+        is_updated_[id] = false; // 更新済みフラグをリセット
+        // 書き込むデータをCmdValuesの範囲を基に切り出す
+    	vector<int64_t> data_int_list( 
+            cmd_values_[id].begin()+start, cmd_values_[id].begin()+end );
+        id_data_int_map[id] = data_int_list;
+    }
+    // データの確認
+    for (auto pair : id_data_int_map) {
+        uint8_t id = pair.first;
+        vector<int64_t> data_int_list = pair.second;
+        ROS_INFO("Servo id [%d] : ", id);
+        for (auto data_int : data_int_list) ROS_INFO("  %d", (int)data_int);
+    }
+    // dyn_comm_.SyncWrite(target_cmd_dp_list, id_data_int_map);
+}
+
+void DynamixelHandler::SyncWriteCmdValues(CmdValues target){
+    SyncWriteCmdValues(target, target+1);
+}
+
+void DynamixelHandler::SyncWriteCmdValues(){
+    const int start = range_updated_cmd_val_.first;
+    const int end   = range_updated_cmd_val_.second+1;
+    SyncWriteCmdValues(start, end);
+}
+
+/**
+ * @func SyncReadStateValues
+ * @brief 指定した範囲の状態値を読み込む
+ * @param start 読み込み開始 dynamixel address インスタンス
+ * @param end   読み込み終了 dynamixel address インスタンス
+ * @return 読み込みに成功したかどうか
+*/
+bool DynamixelHandler::SyncReadStateValues(uint8_t start, uint8_t end){
+    if ( !(0 <= start && start < end && end <= state_dp_list.size()) ) return false;
+
+    vector<DynamixelAddress> target_state_dp_list(
+        state_dp_list.begin()+start, state_dp_list.begin()+end );
+
+    // target_state_dp_listの中身を確認
+    for (auto dp : target_state_dp_list) ROS_INFO("dp: %d", (int)dp.address());
+
+    return true;
+    // auto id_data_map = (has_hardware_error)
+    //     ? dyn_comm_.SyncRead     (target_state_dp_list, id_list_x_)  // エラーがあるときは遅い方
+    //     : dyn_comm_.SyncRead_fast(target_state_dp_list, id_list_x_); // エラーがあるときは早い方
+
+    // // エラー処理
+    // if (id_data_map.size() < id_list_x_.size()){
+    //     ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(id_list_x_.size() - id_data_map.size()));
+    //     for ( auto id : id_list_x_ )
+    //         if ( id_data_map.find(id) == id_data_map.end() )
+    //             ROS_WARN("  * servo id [%d] failed to read", id);
+    // }
+
+    // for (auto id_pos : id_data_map) {
+    //     int id = id_pos.first;
+    //     for (int i = 0; i < id_pos.second.size(); i++) 
+    //         state_vals[id][start+i] = id_pos.second[i];
+    // }
+
+    // return id_data_map.size()>0; // 1つでも成功したら成功とする.
+}
+
+bool DynamixelHandler::SyncReadStateValues(){
+    const auto start = range_read_state_val_.first;
+    const auto end   = range_read_state_val_.second+1;
+    return SyncReadStateValues(start, end);
+}
+
+bool DynamixelHandler::SyncReadStateValues(StateValues target){
+    return SyncReadStateValues(target, target+1);
 }

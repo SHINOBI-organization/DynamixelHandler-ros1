@@ -1,3 +1,5 @@
-uint8[]  ids
-float64[]  present_angles
-float64[]  goal_angles
+time stamp
+string    user_defined_parameter
+uint8[]   id_list
+
+float64[] user_defined_value
