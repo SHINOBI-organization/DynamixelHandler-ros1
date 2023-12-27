@@ -31,6 +31,10 @@ using std::set;
 using std::max_element;
 using std::min_element;
 
+static const double DEG = M_PI/180.0; // degを単位に持つ数字に掛けるとradになる
+static double deg2rad(double deg){ return deg*DEG; }
+static double rad2deg(double rad){ return rad/DEG; }
+
 class DynamixelHandler {
     public:
         //* ROS 初期設定とメインループ
@@ -92,13 +96,14 @@ class DynamixelHandler {
             PRESENT_INPUT_VOLTAGE= 6,
             PRESENT_TEMPERTURE   = 7,
         };
-        static inline vector<uint8_t> id_list_p_; // dynamixel p series
-        static inline vector<uint8_t> id_list_x_; // dynamixel x series
-        static inline map<uint8_t, bool> is_updated_; // cakkbackによって，cmd_valuesが更新されたかどうか．
-        static inline map<uint8_t, array<double, 6>> cmd_values_;  // コマンドとして定義した，サーボに書き込む値
-        static inline map<uint8_t, array<double, 8>> state_values_;// ステータスとして定義した．サーボから読み取った値
+        static inline vector<uint8_t> id_list_; // chained dynamixel id list
+        static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
+        static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
+        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と コマンドとして書き込む値 のマップ
+        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と 状態として常時読み込む値 のマップ
+        static inline map<uint8_t, bool> is_updated_; // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
         static inline set<CmdValues>   list_wirte_cmd_  = {};
-        static inline set<StateValues> list_read_state_ = {PRESENT_POSITION};
+        static inline set<StateValues> list_read_state_ = {PRESENT_POSITION, PRESENT_VELOCITY};
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValues target);
         static void SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
@@ -151,14 +156,5 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_temperture    
     }; 
 } // namespace dyn_p
-
-// ここら変の情報は型番固有の情報なので， dynamixel_parameter.hpp/cpp側に記述して，将来的には自動で読み込ませるようにしたい．
-static int64_t deg2pulse(double deg) { return deg * 4096.0 / 360.0 + 2048; }
-static double  pulse2deg(int64_t pulse) { return (pulse - 2048 ) * 360.0 / 4096.0; }
-static int64_t rad2pulse(double rad) { return rad * 4096.0 / (2.0 * M_PI) + 2048; }
-static double  pulse2rad(int64_t pulse) { return (pulse - 2048 ) * 2.0 * M_PI / 4096.0; } // tmp
-// int64_t mA2pulse(double mA) { return mA / 1.0; }
-// double  pulse2mA(int64_t pulse) { return pulse * 1.0; }
-
 
 #endif /* DYNAMIXEL_HANDLER_H_ */

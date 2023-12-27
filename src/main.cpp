@@ -59,26 +59,26 @@ bool DynamixelHandler::Initialize(){
     // todo rosparamで設定できるようにする
 
     // 内部の情報の初期化
-    for (auto id : id_list_x_) {
-        cmd_values_[id][GOAL_PWM]             = dyn_comm_.tryRead(dyn_x::goal_pwm            , id);    // エラー時は0
-        cmd_values_[id][GOAL_CURRENT]         = dyn_comm_.tryRead(dyn_x::goal_current        , id);    // エラー時は0
-        cmd_values_[id][GOAL_VOLOCITY]        = dyn_comm_.tryRead(dyn_x::goal_velocity       , id);    // エラー時は0
-        cmd_values_[id][PROFILE_ACCELERATION] = dyn_comm_.tryRead(dyn_x::profile_acceleration, id);    // エラー時は0
-        cmd_values_[id][PROFILE_VELOCITY]     = dyn_comm_.tryRead(dyn_x::profile_velocity    , id);    // エラー時は0
-        cmd_values_[id][GOAL_POSITION]        = dyn_comm_.tryRead(dyn_x::goal_position       , id);    // エラー時は0
+    for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
+        cmd_values_[id][GOAL_PWM]             = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);    // エラー時は0
+        cmd_values_[id][GOAL_CURRENT]         = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);    // エラー時は0
+        cmd_values_[id][GOAL_VOLOCITY]        = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);    // エラー時は0
+        cmd_values_[id][PROFILE_ACCELERATION] = profile_acceleration.pulse2val(dyn_comm_.tryRead(profile_acceleration, id), model_[id]);    // エラー時は0
+        cmd_values_[id][PROFILE_VELOCITY]     = profile_velocity.pulse2val    (dyn_comm_.tryRead(profile_velocity    , id), model_[id]);    // エラー時は0
+        cmd_values_[id][GOAL_POSITION]        = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);    // エラー時は0
     }
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
-    for (auto id : id_list_x_) {
-        if ( TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
-        // 以下は適当，あとでちゃんと書く
-        dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION);  
-        dyn_comm_.tryWrite(profile_acceleration, id, 500); // 0~32767 数字は適当
-        dyn_comm_.tryWrite(profile_velocity, id, 100); // 0~32767 数字は適当
-        dyn_comm_.tryWrite(homing_offset, id, 0);
+    for (auto id : id_list_) if (series_[id] == SERIES_X) {
         if ( CheckHardwareError(id) ) ClearHardwareError(id, TORQUE_DISABLE); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-        if ( TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
+        if ( !TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
+        if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_EXTENDED_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
+        if ( !dyn_comm_.tryWrite(profile_acceleration, id, 500)) ROS_WARN("Servo id [%d] failed to set profile_acceleration", id);
+        if ( !dyn_comm_.tryWrite(profile_velocity, id, 100)) ROS_WARN("Servo id [%d] failed to set profile_velocity", id);
+        if ( !dyn_comm_.tryWrite(homing_offset, id, 0)) ROS_WARN("Servo id [%d] failed to set homing_offset", id);
+        if ( !TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
     }
+
     return true;
 }
 
@@ -92,22 +92,22 @@ void DynamixelHandler::MainLoop(){
     //* Dynamixelから状態Read & topicをPublish
     if ( state_pub_ratio_==0 || cnt % state_pub_ratio_ == 0 ) {
         bool is_suc = false;
-        if ( !use_slipt_read_ ) is_suc = SyncReadStateValues();
-        else for (auto state : list_read_state_) is_suc += SyncReadStateValues(state);
+        if ( !use_slipt_read_ )                      is_suc  = SyncReadStateValues(list_read_state_);
+        else for (StateValues st : list_read_state_) is_suc += SyncReadStateValues(st);
         if (is_suc) BroadcastDynamixelState();
     }
-    if ( config_pub_ratio_!=0 || cnt % config_pub_ratio_ == 0 ) {
+    if ( config_pub_ratio_!=0 && cnt % config_pub_ratio_ == 0 ) {
         // const bool is_suc = SyncReadConfigParameter(); 
         // if (is_suc) BroadcastDynamixelConfig();
     }
-    if ( error_pub_ratio_!=0 ||cnt % error_pub_ratio_ == 0 ) {
+    if ( error_pub_ratio_!=0  && cnt % error_pub_ratio_ == 0 ) {
         const bool is_suc = SyncReadHardwareError();
         // if (is_suc) = BroadcastDynamixelHardwareError();
     }
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();
-    SyncWriteCmdValues();
+    SyncWriteCmdValues(list_wirte_cmd_);
 }
 
 int main(int argc, char **argv) {
