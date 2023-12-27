@@ -26,10 +26,11 @@ using std::map;
 using std::vector;
 #include <array>
 using std::array;
-#include <utility>
-using std::pair;
-using std::max;
-using std::min;
+#include <set>
+using std::set;
+#include <algorithm>
+using std::max_element;
+using std::min_element;
 
 class DynamixelHandler {
     public:
@@ -94,13 +95,13 @@ class DynamixelHandler {
         static inline map<uint8_t, bool> is_updated_; // cakkbackによって，cmd_valuesが更新されたかどうか．
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // コマンドとして定義した，サーボに書き込む値
         static inline map<uint8_t, array<double, 8>> state_values_;// ステータスとして定義した．サーボから読み取った値
-        static inline pair<CmdValues,  CmdValues>   range_write_ = {GOAL_POSITION,    GOAL_PWM};
-        static inline pair<StateValues,StateValues> range_read_  = {PRESENT_POSITION, PRESENT_PWM};
+        static inline set<CmdValues>   list_wirte_cmd_  = {};
+        static inline set<StateValues> list_read_state_ = {PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValues target);
-        static void SyncWriteCmdValues(pair<CmdValues, CmdValues> range=range_write_);
+        static void SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
         static bool SyncReadStateValues(StateValues target);
-        static bool SyncReadStateValues(pair<StateValues, StateValues> range=range_read_);
+        static bool SyncReadStateValues(set<StateValues>& list_read_state=list_read_state_);
         static bool SyncReadHardwareError();
 
         // その他

@@ -55,7 +55,6 @@ bool DynamixelHandler::Initialize(){
 
     //  readする情報の設定
     // todo rosparamで設定できるようにする
-    range_read_ = {PRESENT_CURRENT, PRESENT_POSITION};
 
     // 内部の情報の初期化
     for (auto id : id_list_x_) {
@@ -85,15 +84,13 @@ void DynamixelHandler::MainLoop(){
     static int cnt = 0;
     static ros::Rate rate(loop_rate_);
 
-    //* エラーの確認
-    if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError();
-
     //* デバック
     // if (varbose_) ShowDynamixelChain();
 
     //* Dynamixelから状態Read & topicをPublish
     bool is_success = SyncReadStateValues();
     if ( is_success ) BroadcastDynamixelState();
+    if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError();
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();
