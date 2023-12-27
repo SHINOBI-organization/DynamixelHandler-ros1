@@ -49,9 +49,11 @@ bool DynamixelHandler::Initialize(){
     }
 
     // main loop の設定
-    if (!nh_p.getParam("varbose",          varbose_    )) varbose_     =  false;
-    if (!nh_p.getParam("loop_rate",        loop_rate_  )) loop_rate_   =  50;
-    if (!nh_p.getParam("error_read_ratio", error_ratio_)) error_ratio_ =  100;
+    if (!nh_p.getParam("varbose",          varbose_   )) varbose_   =  false;
+    if (!nh_p.getParam("loop_rate",        loop_rate_ )) loop_rate_ =  50;
+    if (!nh_p.getParam("state_read_ratio",  state_pub_ratio_  )) state_pub_ratio_  =  1;
+    if (!nh_p.getParam("config_read_ratio", config_pub_ratio_ )) config_pub_ratio_ =  0;
+    if (!nh_p.getParam("error_read_ratio",  error_pub_ratio_  )) error_pub_ratio_  =  100;
 
     //  readする情報の設定
     // todo rosparamで設定できるようにする
@@ -81,16 +83,27 @@ bool DynamixelHandler::Initialize(){
 }
 
 void DynamixelHandler::MainLoop(){
-    static int cnt = 0;
+    static int cnt = 0; cnt++;
     static ros::Rate rate(loop_rate_);
 
     //* デバック
     // if (varbose_) ShowDynamixelChain();
 
     //* Dynamixelから状態Read & topicをPublish
-    bool is_success = SyncReadStateValues();
-    if ( is_success ) BroadcastDynamixelState();
-    if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError();
+    if ( state_pub_ratio_==0 || cnt % state_pub_ratio_ == 0 ) {
+        bool is_suc = false;
+        if ( !use_slipt_read_ ) is_suc = SyncReadStateValues();
+        else for (auto state : list_read_state_) is_suc += SyncReadStateValues(state);
+        if (is_suc) BroadcastDynamixelState();
+    }
+    if ( config_pub_ratio_!=0 || cnt % config_pub_ratio_ == 0 ) {
+        // const bool is_suc = SyncReadConfigParameter(); 
+        // if (is_suc) BroadcastDynamixelConfig();
+    }
+    if ( error_pub_ratio_!=0 ||cnt % error_pub_ratio_ == 0 ) {
+        const bool is_suc = SyncReadHardwareError();
+        // if (is_suc) = BroadcastDynamixelHardwareError();
+    }
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();

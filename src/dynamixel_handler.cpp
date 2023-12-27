@@ -86,7 +86,7 @@ bool DynamixelHandler::SyncReadHardwareError(){
     return true;
 }
 
-void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg) {
+void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmdFree& msg) {
     // if (msg.command == "reboot") { 
     //     for (auto id : msg.ids) ClearHardwareError(id);
     //     if (msg.ids.size() == 0) for (auto id : id_list_x_) ClearHardwareError(id);
@@ -241,7 +241,7 @@ bool DynamixelHandler::SyncReadStateValues(StateValues target){
 }
 
 void DynamixelHandler::BroadcastDynamixelState(){
-    dynamixel_handler::DynamixelState_Dynamic msg;
+    dynamixel_handler::DynamixelState msg;
     for (auto id : id_list_x_) {
         msg.id_list.push_back(id);
         for (auto state : list_read_state_) switch(state){

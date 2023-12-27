@@ -5,14 +5,13 @@
 #include <std_msgs/String.h>
 
 #include "dynamixel_communicator.h"
-#include <dynamixel_handler/DynamixelCmd.h>
+#include <dynamixel_handler/DynamixelCmdFree.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlPosition.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlVelocity.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlCurrent.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlCurrentPosition.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlExtendedPosition.h>
 #include <dynamixel_handler/DynamixelState.h>
-#include <dynamixel_handler/DynamixelState_Dynamic.h>
 
 #include <thread>
 using std::this_thread::sleep_for;
@@ -39,7 +38,7 @@ class DynamixelHandler {
         static void MainLoop();
         //* ROS subscliber callback関数
         static void BroadcastDynamixelState();
-        static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg);
+        static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmdFree& msg);
         static void CallBackOfDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
         static void CallBackOfDxlCmd_X_Velocity        (const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg);
         static void CallBackOfDxlCmd_X_Current         (const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg);
@@ -68,7 +67,10 @@ class DynamixelHandler {
         // main loop 内で使う
         static inline bool varbose_      = false;
         static inline int  loop_rate_    = 50;
-        static inline int  error_ratio_  = 100;
+        static inline int  state_pub_ratio_  = 1; 
+        static inline int  config_pub_ratio_ = 100; // 0の時は初回のみ
+        static inline int  error_pub_ratio_  = 100;
+        static inline bool use_slipt_read_   = false;
         // Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
         // 連結しているDynamixelの情報を保持する変数

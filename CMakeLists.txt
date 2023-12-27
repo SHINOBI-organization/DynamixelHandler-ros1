@@ -53,14 +53,15 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   
-  DynamixelState.msg
-  DynamixelState_Dynamic.msg
-  DynamixelState_Static.msg
+  DynamixelStateFree.msg
+  DynamixelCmdFree.msg
 
-  DynamixelCmdState_Gains.msg
-  DynamixelCmdState_Limits.msg
-  
-  DynamixelCmd.msg
+  DynamixelState.msg
+
+  DynamixelConfig_Gains.msg
+  DynamixelConfig_Limits.msg
+    
+  DynamixelCmd_Options.msg
   DynamixelCmd_X_ControlCurrent.msg
   DynamixelCmd_X_ControlCurrentPosition.msg
   DynamixelCmd_X_ControlExtendedPosition.msg
