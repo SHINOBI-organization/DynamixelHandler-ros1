@@ -37,7 +37,7 @@ class DynamixelHandler {
         static bool Initialize();
         static void MainLoop();
         //* ROS subscliber callback関数
-        static void BroadcastDynamixelState_Dynamic();
+        static void BroadcastDynamixelState();
         static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmd& msg);
         static void CallBackOfDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
         static void CallBackOfDxlCmd_X_Velocity        (const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg);
@@ -63,7 +63,6 @@ class DynamixelHandler {
         static bool TorqueDisable(uint8_t servo_id);
         static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
         static bool CheckHardwareError(uint8_t servo_id);
-        static bool SyncReadHardwareError();
 
         // main loop 内で使う
         static inline bool varbose_      = false;
@@ -71,9 +70,7 @@ class DynamixelHandler {
         static inline int  error_ratio_  = 100;
         // Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
-        // 連結しているDynamixelの情報
-        static inline vector<uint8_t> id_list_p_; // dynamixel p series
-        static inline vector<uint8_t> id_list_x_; // dynamixel x series
+        // 連結しているDynamixelの情報を保持する変数
         enum CmdValues {
             GOAL_PWM             = 0,
             GOAL_CURRENT         = 1,
@@ -92,18 +89,19 @@ class DynamixelHandler {
             PRESENT_INPUT_VOLTAGE= 6,
             PRESENT_TEMPERTURE   = 7,
         };
+        static inline vector<uint8_t> id_list_p_; // dynamixel p series
+        static inline vector<uint8_t> id_list_x_; // dynamixel x series
         static inline map<uint8_t, bool> is_updated_; // cakkbackによって，cmd_valuesが更新されたかどうか．
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // コマンドとして定義した，サーボに書き込む値
         static inline map<uint8_t, array<double, 8>> state_values_;// ステータスとして定義した．サーボから読み取った値
         static inline pair<CmdValues,  CmdValues>   range_write_ = {GOAL_POSITION,    GOAL_PWM};
         static inline pair<StateValues,StateValues> range_read_  = {PRESENT_POSITION, PRESENT_PWM};
-        //* cmd_vals と state_vals の更新
-        // static void SyncWriteCmdValues();
+        //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValues target);
         static void SyncWriteCmdValues(pair<CmdValues, CmdValues> range=range_write_);
-        // static bool SyncReadStateValues();
         static bool SyncReadStateValues(StateValues target);
         static bool SyncReadStateValues(pair<StateValues, StateValues> range=range_read_);
+        static bool SyncReadHardwareError();
 
         // その他
         static inline bool has_hardware_error = false;

@@ -85,29 +85,18 @@ void DynamixelHandler::MainLoop(){
     static int cnt = 0;
     static ros::Rate rate(loop_rate_);
 
+    //* エラーの確認
     if ( ++cnt % error_ratio_ == 0 ) SyncReadHardwareError();
 
-    // Dynamixelから現在角をRead & topicをPublish
-    bool is_success = SyncReadStateValues();
-    if ( is_success ) {
-        // dynamixel_handler::DynamixelState msg;
-        // msg.ids.resize(id_list_x_.size());
-        // msg.present_angles.resize(id_list_x_.size());
-        // msg.goal_angles.resize(id_list_x_.size());
-        // for (size_t i = 0; i < id_list_x_.size(); i++) {
-        //     msg.ids[i] = id_list_x_[i];
-        //     msg.present_angles[i] = pulse2rad(dynamixel_chain[id_list_x_[i]].present_position);
-        //     msg.goal_angles[i]    = pulse2rad(dynamixel_chain[id_list_x_[i]].goal_position);
-        // }
-        // pub_dyn_state_.publish(msg);
-    }
-
-    // デバック用
+    //* デバック
     // if (varbose_) ShowDynamixelChain();
 
-    // topicをSubscribe & Dynamixelへ目標角をWrite
-    ros::spinOnce();
-    rate.sleep();
+    //* Dynamixelから状態Read & topicをPublish
+    bool is_success = SyncReadStateValues();
+    if ( is_success ) BroadcastDynamixelState();
+
+    //* topicをSubscribe & Dynamixelへ目標角をWrite
+    /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();
     SyncWriteCmdValues();
 }
 

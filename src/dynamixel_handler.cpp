@@ -255,7 +255,7 @@ bool DynamixelHandler::SyncReadStateValues(StateValues target){
     return SyncReadStateValues({target, target});
 }
 
-void DynamixelHandler::BroadcastDynamixelState_Dynamic(){
+void DynamixelHandler::BroadcastDynamixelState(){
     const auto start = range_read_.first;
     const auto end   = range_read_.second+1;
     if ( !(0 <= start && start < end && end <= state_dp_list.size()) ) return;
