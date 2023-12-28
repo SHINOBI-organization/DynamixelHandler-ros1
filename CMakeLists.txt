@@ -174,8 +174,8 @@ include_directories(
 add_executable(dynamixel_handler_node 
 	include/mylib_dynamixel/download/port_handler_linux.cpp
 	include/mylib_dynamixel/download/port_handler.cpp
-	include/mylib_dynamixel/src/dynamixel_communicator.cpp
-	include/mylib_dynamixel/src/dynamixel_communicator_withRetry.cpp
+	include/mylib_dynamixel/src/dynamixel_communicator_main.cpp
+	include/mylib_dynamixel/src/dynamixel_communicator_retry.cpp
 	
 	src/dynamixel_handler.cpp
 	src/main.cpp
