@@ -96,6 +96,7 @@ bool DynamixelHandler::SyncReadHardwareError(){
  * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
 */
 void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
+    if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
     const CmdValues start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
     const CmdValues end   = *max_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
     list_wirte_cmd.clear(); // 先にクリアすることで，誤ってstartと　endに変な値が混入した場合の影響が永続しないようにする．
@@ -109,11 +110,22 @@ void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
         target_cmd_dp_list.push_back(dp); 
         for (int id : id_list_) if ( series_[id]==SERIES_X ) {
             if ( !is_updated_[id] ) continue; // 更新されていない場合はスキップ
-                  is_updated_[id] = false;    // 更新済みフラグをリセット
             id_data_vec_map[id].push_back( dp.val2pulse( cmd_values_[id][cmd], model_[id]) );
         }
     }
-    // dyn_comm_.SyncWrite(target_cmd_dp_list, id_data_vec_map);
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) is_updated_[id] = false;
+
+    //id_data_vec_mapの中身を確認
+    if ( varbose_ ) {
+        ROS_INFO("SyncWriteCmdValues: %d servo(s) will be written", (int)id_data_vec_map.size());
+        for ( auto pair : id_data_vec_map ) {
+            const uint8_t id = pair.first;
+            const vector<int64_t> data_vec = pair.second;
+            ROS_INFO("  * servo id [%d] will be written", id);
+            for ( auto data : data_vec ) ROS_INFO("    - %d", (int)data);
+        }
+    }
+    dyn_comm_.SyncWrite(target_cmd_dp_list, id_data_vec_map);
 }
 void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ 
     set<CmdValues> tmp{target};
@@ -127,9 +139,9 @@ void DynamixelHandler::SyncWriteCmdValues(CmdValues target){
  * @return 読み込みに成功したかどうか
 */
 bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
+    if ( list_read_state.empty() ) return false; // 空なら何もしない
     const StateValues start = *min_element(list_read_state.begin(), list_read_state.end());
     const StateValues end   = *max_element(list_read_state.begin(), list_read_state.end());
-    list_read_state.clear(); // 先にクリアすることで，誤ってstartと　endに変な値が混入した場合の影響が永続しないようにする．
     if ( !(0 <= start && start <= end && end < state_dp_list.size()) ) return false;
 
     vector<DynamixelAddress> target_state_dp_list(
@@ -138,27 +150,26 @@ bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     vector<uint8_t> target_id_list;
     for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
 
-    return true;
-    // auto id_data_int_map = use_fast_read_ ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
-    //                                       : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
-    // // エラー処理
-    // if ( varbose_ && id_data_int_map.size() < target_id_list.size()){
-    //     ROS_WARN("SyncReadPosition: %d servo(s) failed to read", (int)(target_id_list.size() - id_data_int_map.size()));
-    //     for ( auto id : target_id_list )
-    //         if ( id_data_int_map.find(id) == id_data_int_map.end() ) 
-    //             ROS_WARN("  * servo id [%d] failed to read", id);
-    // }
+    auto id_data_vec_map = use_fast_read_ ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
+                                          : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
+    // エラー処理
+    if ( varbose_ && id_data_vec_map.size() < target_id_list.size()){
+        ROS_WARN("SyncReadStateValues: %d servo(s) failed to read", (int)(target_id_list.size() - id_data_vec_map.size()));
+        for ( auto id : target_id_list )
+            if ( id_data_vec_map.find(id) == id_data_vec_map.end() ) 
+                ROS_WARN("  * servo id [%d] failed to read", id);
+    }
+    
+    for (int i = 0; i <= end-start; i++) {
+        const auto dp = target_state_dp_list[i];
+        for (auto pair : id_data_vec_map) {
+            const uint8_t id = pair.first;
+            const int64_t data_int = pair.second[i];
+            state_values_[id][start+i] = dp.pulse2val( data_int, model_[id]);
+        }
+    }
 
-    // for (int state = start; state <= end; state++) {
-    //     const auto dp = target_state_dp_list[state];
-    //     for (auto pair : id_data_int_map) {
-    //         const uint8_t id = pair.first;
-    //         const int64_t data_int = pair.second[state];
-    //         id_data_vec_map[id][state] = dp.pulse2val( data_int, model_[id]);
-    //     }
-    // }
-
-    // return id_data_int_map.size()>0; // 1つでも成功したら成功とする.
+    return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 bool DynamixelHandler::SyncReadStateValues(StateValues target){ 
     set<StateValues> tmp{target};
@@ -183,6 +194,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Position(const dynamixel_handler::Dyna
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
+    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_Position");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg) {
@@ -191,10 +203,11 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::Dyna
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto vel = msg.velocity__deg_s[i];
-        cmd_values_[id][GOAL_VOLOCITY] = deg2rad(vel);
+        cmd_values_[id][GOAL_VELOCITY] = deg2rad(vel);
         is_updated_[id] = true;
-        list_wirte_cmd_.insert(GOAL_VOLOCITY);
+        list_wirte_cmd_.insert(GOAL_VELOCITY);
     }
+    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_Velocity");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg) {
@@ -207,6 +220,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::Dynam
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
     }
+    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_Current");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg) {
@@ -230,6 +244,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handle
             list_wirte_cmd_.insert(GOAL_CURRENT);
         }
     }
+    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_CurrentPosition");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg) {
@@ -244,21 +259,23 @@ void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handl
         cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
+    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_ExtendedPosition");
 }
 
 void DynamixelHandler::BroadcastDynamixelState(){
     dynamixel_handler::DynamixelState msg;
     for (auto id : id_list_) {
         msg.id_list.push_back(id);
-        for (auto state : list_read_state_) switch(state){
+        msg.stamp = ros::Time::now();
+        for (auto state : list_read_state_) switch(state) {
             case PRESENT_CURRENT:      msg.current__mA.push_back          (state_values_[id][PRESENT_CURRENT      ]    ); break;
-            case PRESENT_VELOCITY:     msg.velocity__deg_s.push_back      (state_values_[id][PRESENT_VELOCITY     ]*DEG); break;
-            case PRESENT_POSITION:     msg.position__deg.push_back        (state_values_[id][PRESENT_POSITION     ]*DEG); break;
-            case VELOCITY_TRAJECTORY:  msg.vel_trajectory__deg_s.push_back(state_values_[id][VELOCITY_TRAJECTORY  ]*DEG); break;
-            case POSITION_TRAJECTORY:  msg.pos_trajectory__deg.push_back  (state_values_[id][POSITION_TRAJECTORY  ]*DEG); break;
+            case PRESENT_VELOCITY:     msg.velocity__deg_s.push_back      (state_values_[id][PRESENT_VELOCITY     ]/DEG); break;
+            case PRESENT_POSITION:     msg.position__deg.push_back        (state_values_[id][PRESENT_POSITION     ]/DEG); break;
+            case VELOCITY_TRAJECTORY:  msg.vel_trajectory__deg_s.push_back(state_values_[id][VELOCITY_TRAJECTORY  ]/DEG); break;
+            case POSITION_TRAJECTORY:  msg.pos_trajectory__deg.push_back  (state_values_[id][POSITION_TRAJECTORY  ]/DEG); break;
             case PRESENT_TEMPERTURE:   msg.temperature__degC.push_back    (state_values_[id][PRESENT_TEMPERTURE   ]    ); break;
             case PRESENT_INPUT_VOLTAGE:msg.input_voltage__V.push_back     (state_values_[id][PRESENT_INPUT_VOLTAGE]    ); break;
         }
     }
-    pub_dyn_state_.publish(msg);
+    pub_state_.publish(msg);
 }

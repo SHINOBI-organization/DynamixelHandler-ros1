@@ -35,12 +35,20 @@ static const double DEG = M_PI/180.0; // degを単位に持つ数字に掛ける
 static double deg2rad(double deg){ return deg*DEG; }
 static double rad2deg(double rad){ return rad/DEG; }
 
+/**
+ * DynamixelをROSで動かすためのクラス．本pkgのメインクラス． 
+ * 基本的に Initialize() 呼出し後， while(ros::ok())内で MainLoop() を呼び出すだけでよい．
+ * その他の関数は Initialize() と MainLoop() のロジックを構成するための部品に過ぎない．
+ * 
+ * 検出したDynamixelに関して，idのみベクトルとして保持し，
+ * それ以外の情報はすべて，idをキーとしたmapに保持している．
+*/
 class DynamixelHandler {
     public:
         //* ROS 初期設定とメインループ
         static bool Initialize();
         static void MainLoop();
-        //* ROS subscliber callback関数
+        //* ROS publishを担う関数と subscliber callback関数
         static void BroadcastDynamixelState();
         static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmdFree& msg);
         static void CallBackOfDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
@@ -48,15 +56,14 @@ class DynamixelHandler {
         static void CallBackOfDxlCmd_X_Current         (const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg);
         static void CallBackOfDxlCmd_X_CurrentPosition (const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg);
         static void CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg);
-        //* ROS publisher publisher instance
-        static inline ros::Publisher  pub_dyn_state_;
-        // static ros::Publisher  pub_dyn_state_; //todo いくつかのデフォルトを用意しておく
-        static inline ros::Subscriber cmd_free_;
-        static inline ros::Subscriber cmd_x_pos_;
-        static inline ros::Subscriber cmd_x_vel_;
-        static inline ros::Subscriber cmd_x_cur_;
-        static inline ros::Subscriber cmd_x_cpos_;
-        static inline ros::Subscriber cmd_x_epos_;
+        //* ROS publisher subscriber instance
+        static inline ros::Publisher  pub_state_;
+        static inline ros::Subscriber sub_cmd_free_;
+        static inline ros::Subscriber sub_cmd_x_pos_;
+        static inline ros::Subscriber sub_cmd_x_vel_;
+        static inline ros::Subscriber sub_cmd_x_cur_;
+        static inline ros::Subscriber sub_cmd_x_cpos_;
+        static inline ros::Subscriber sub_cmd_x_epos_;
 
     private:
         DynamixelHandler() = delete;
@@ -68,20 +75,21 @@ class DynamixelHandler {
         static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
         static bool CheckHardwareError(uint8_t servo_id);
 
-        // main loop 内で使う
-        static inline bool varbose_      = false;
+        // フラグとパラメータ
         static inline int  loop_rate_    = 50;
         static inline int  state_pub_ratio_  = 1; 
         static inline int  config_pub_ratio_ = 100; // 0の時は初回のみ
         static inline int  error_pub_ratio_  = 100;
-        static inline bool use_slipt_read_   = false;
+        static inline bool varbose_      = false;
+        static inline bool use_slipt_read_  = false;
+        static inline bool use_fast_read_   = true;
         // Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
         // 連結しているDynamixelの情報を保持する変数
         enum CmdValues {
             GOAL_PWM             = 0,
             GOAL_CURRENT         = 1,
-            GOAL_VOLOCITY        = 2,
+            GOAL_VELOCITY        = 2,
             PROFILE_ACCELERATION = 3,
             PROFILE_VELOCITY     = 4,
             GOAL_POSITION        = 5,

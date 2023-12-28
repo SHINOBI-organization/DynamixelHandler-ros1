@@ -8,14 +8,14 @@ bool DynamixelHandler::Initialize(){
     ros::NodeHandle nh_p("~");
 
     // Subscriber / Publisherの設定
-    cmd_free_  = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackOfDynamixelCommand);
-    cmd_x_pos_ = nh.subscribe("/dynamixel/x_cmd/position", 10, DynamixelHandler::CallBackOfDxlCmd_X_Position);
-    cmd_x_vel_ = nh.subscribe("/dynamixel/x_cmd/velocity", 10, DynamixelHandler::CallBackOfDxlCmd_X_Velocity);
-    cmd_x_cur_ = nh.subscribe("/dynamixel/x_cmd/current",  10, DynamixelHandler::CallBackOfDxlCmd_X_Current);
-    cmd_x_cpos_ = nh.subscribe("/dynamixel/x_cmd/current_position",  10, DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition);
-    cmd_x_epos_ = nh.subscribe("/dynamixel/cx_md/extended_position", 10, DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition);
+    sub_cmd_free_  = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackOfDynamixelCommand);
+    sub_cmd_x_pos_ = nh.subscribe("/dynamixel/x_cmd/position", 10, DynamixelHandler::CallBackOfDxlCmd_X_Position);
+    sub_cmd_x_vel_ = nh.subscribe("/dynamixel/x_cmd/velocity", 10, DynamixelHandler::CallBackOfDxlCmd_X_Velocity);
+    sub_cmd_x_cur_ = nh.subscribe("/dynamixel/x_cmd/current",  10, DynamixelHandler::CallBackOfDxlCmd_X_Current);
+    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/x_cmd/current_position",  10, DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition);
+    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/x_cmd/extended_position", 10, DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition);
 
-    pub_dyn_state_ = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
+    pub_state_ = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
 
     // 通信の開始
     int BAUDRATE; string DEVICE_NAME;
@@ -43,7 +43,7 @@ bool DynamixelHandler::Initialize(){
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
         return false;
     }
-    if( num_expexted>0 && num_expexted>num_found ) {
+    if( num_expexted>0 && num_expexted!=num_found ) {
         ROS_ERROR("Number of Dynamixel is not matched. Expected [%d], but found [%d]", num_expexted, num_found);
         return false;
     }
@@ -62,7 +62,7 @@ bool DynamixelHandler::Initialize(){
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
         cmd_values_[id][GOAL_PWM]             = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);    // エラー時は0
         cmd_values_[id][GOAL_CURRENT]         = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);    // エラー時は0
-        cmd_values_[id][GOAL_VOLOCITY]        = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);    // エラー時は0
+        cmd_values_[id][GOAL_VELOCITY]        = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);    // エラー時は0
         cmd_values_[id][PROFILE_ACCELERATION] = profile_acceleration.pulse2val(dyn_comm_.tryRead(profile_acceleration, id), model_[id]);    // エラー時は0
         cmd_values_[id][PROFILE_VELOCITY]     = profile_velocity.pulse2val    (dyn_comm_.tryRead(profile_velocity    , id), model_[id]);    // エラー時は0
         cmd_values_[id][GOAL_POSITION]        = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);    // エラー時は0
