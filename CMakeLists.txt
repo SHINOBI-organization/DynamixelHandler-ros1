@@ -54,7 +54,7 @@ add_message_files(
   FILES
   
   DynamixelStateFree.msg
-  DynamixelCmdFree.msg
+  DynamixelCommandFree.msg
 
   DynamixelState.msg
 
@@ -64,16 +64,16 @@ add_message_files(
 
   DynamixelError.msg
     
-  DynamixelCmd_Option.msg
-  DynamixelCmd_X_ControlCurrent.msg
-  DynamixelCmd_X_ControlCurrentPosition.msg
-  DynamixelCmd_X_ControlExtendedPosition.msg
-  DynamixelCmd_X_ControlPosition.msg
-  DynamixelCmd_X_ControlVelocity.msg
-  DynamixelCmd_P_ControlCurrent.msg
-  DynamixelCmd_P_ControlExtendedPosition.msg
-  DynamixelCmd_P_ControlPosition.msg
-  DynamixelCmd_P_ControlVelocity.msg
+  DynamixelCommand_Option.msg
+  DynamixelCommand_X_ControlCurrent.msg
+  DynamixelCommand_X_ControlCurrentPosition.msg
+  DynamixelCommand_X_ControlExtendedPosition.msg
+  DynamixelCommand_X_ControlPosition.msg
+  DynamixelCommand_X_ControlVelocity.msg
+  DynamixelCommand_P_ControlCurrent.msg
+  DynamixelCommand_P_ControlExtendedPosition.msg
+  DynamixelCommand_P_ControlPosition.msg
+  DynamixelCommand_P_ControlVelocity.msg
 )
 
 ## Generate services in the 'srv' folder

@@ -11,13 +11,13 @@
 #include <dynamixel_handler/DynamixelConfig_Limit.h>
 #include <dynamixel_handler/DynamixelConfig_Gain.h>
 #include <dynamixel_handler/DynamixelConfig_Mode.h>
-#include <dynamixel_handler/DynamixelCmdFree.h>
-#include <dynamixel_handler/DynamixelCmd_Option.h>
-#include <dynamixel_handler/DynamixelCmd_X_ControlPosition.h>
-#include <dynamixel_handler/DynamixelCmd_X_ControlVelocity.h>
-#include <dynamixel_handler/DynamixelCmd_X_ControlCurrent.h>
-#include <dynamixel_handler/DynamixelCmd_X_ControlCurrentPosition.h>
-#include <dynamixel_handler/DynamixelCmd_X_ControlExtendedPosition.h>
+#include <dynamixel_handler/DynamixelCommandFree.h>
+#include <dynamixel_handler/DynamixelCommand_Option.h>
+#include <dynamixel_handler/DynamixelCommand_X_ControlPosition.h>
+#include <dynamixel_handler/DynamixelCommand_X_ControlVelocity.h>
+#include <dynamixel_handler/DynamixelCommand_X_ControlCurrent.h>
+#include <dynamixel_handler/DynamixelCommand_X_ControlCurrentPosition.h>
+#include <dynamixel_handler/DynamixelCommand_X_ControlExtendedPosition.h>
 
 #include <thread>
 using std::this_thread::sleep_for;
@@ -64,13 +64,13 @@ class DynamixelHandler {
         static void CallBackDxlConfig_Limit (const dynamixel_handler::DynamixelConfig_Limit& msg);
         static void CallBackDxlConfig_Gain  (const dynamixel_handler::DynamixelConfig_Gain& msg);
         static void CallBackDxlConfig_Mode  (const dynamixel_handler::DynamixelConfig_Mode& msg);
-        static void CallBackDxlCmdFree    (const dynamixel_handler::DynamixelCmdFree& msg);
-        static void CallBackDxlCmd_Option (const dynamixel_handler::DynamixelCmd_Option& msg);
-        static void CallBackDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
-        static void CallBackDxlCmd_X_Velocity        (const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg);
-        static void CallBackDxlCmd_X_Current         (const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg);
-        static void CallBackDxlCmd_X_CurrentPosition (const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg);
-        static void CallBackDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg);
+        static void CallBackDxlCommandFree    (const dynamixel_handler::DynamixelCommandFree& msg);
+        static void CallBackDxlCommand_Option (const dynamixel_handler::DynamixelCommand_Option& msg);
+        static void CallBackDxlCommand_X_Position        (const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg);
+        static void CallBackDxlCommand_X_Velocity        (const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg);
+        static void CallBackDxlCommand_X_Current         (const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg);
+        static void CallBackDxlCommand_X_CurrentPosition (const dynamixel_handler::DynamixelCommand_X_ControlCurrentPosition& msg);
+        static void CallBackDxlCommand_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg);
         //* ROS publisher subscriber instance
         static inline ros::Publisher  pub_state_;
         static inline ros::Publisher  pub_state_free_;
