@@ -68,24 +68,36 @@ bool DynamixelHandler::CheckHardwareError(uint8_t id){
 }
 
 bool DynamixelHandler::SyncReadHardwareError(){
-    ROS_INFO("SyncReadHardwareInfo: Checking hardware error");
     
     auto id_error_map = dyn_comm_.SyncRead(hardware_error_status, id_list_);
+    if (dyn_comm_.timeout_last_read()   ) return false; // 読み込み失敗
+    if (dyn_comm_.comm_error_last_read()) return false; // 読み込み失敗
 
-    has_hardware_error = false;
-    for (auto pair : id_error_map) has_hardware_error += (bool)pair.second; // errorがあるときは0以外の値になる．
-    if ( !has_hardware_error ) return false;
+    //  hardware_error_に反映
+    for ( auto pair : id_error_map ){
+        const uint8_t id = pair.first;
+        const uint8_t error = pair.second;
+        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) hardware_error_[id][INPUT_VOLTAGE     ] = true;
+        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) hardware_error_[id][MOTOR_HALL_SENSOR ] = true;
+        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) hardware_error_[id][OVERHEATING       ] = true;
+        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) hardware_error_[id][MOTOR_ENCODER     ] = true;
+        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) hardware_error_[id][ELECTRONICAL_SHOCK] = true;
+        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) hardware_error_[id][OVERLOAD          ] = true;
+    }
 
-    ROS_ERROR("SyncReadHardwareError: Hardware Error is detected");
-    for (auto pair : id_error_map) {
-        uint8_t id = pair.first;
-        uint8_t error = pair.second;
-        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) ROS_ERROR("  * servo id [%d] : INPUT_VOLTAGE",     id);
-        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_HALL_SENSOR", id);
-        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERHEATING",       id);
-        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) ROS_ERROR("  * servo id [%d] : MOTOR_ENCODER",     id);
-        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) ROS_ERROR("  * servo id [%d] : ELECTRONICAL_SHOCK",id);
-        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) ROS_ERROR("  * servo id [%d] : OVERLOAD",          id);
+    // コンソールへの表示
+    if ( varbose_read_hwerr_ ) {
+        ROS_WARN("SyncReadHardwareError: Hardware error are Checked");
+        for (auto pair : hardware_error_) {
+            uint8_t id = pair.first;
+            auto error = pair.second;
+            if (error[INPUT_VOLTAGE     ]) ROS_ERROR(" * servo id [%d] has INPUT_VOLTAGE error",      id);
+            if (error[MOTOR_HALL_SENSOR ]) ROS_ERROR(" * servo id [%d] has MOTOR_HALL_SENSOR error",  id);
+            if (error[OVERHEATING       ]) ROS_ERROR(" * servo id [%d] has OVERHEATING error",        id);
+            if (error[MOTOR_ENCODER     ]) ROS_ERROR(" * servo id [%d] has MOTOR_ENCODER error",      id);
+            if (error[ELECTRONICAL_SHOCK]) ROS_ERROR(" * servo id [%d] has ELECTRONICAL_SHOCK error", id);
+            if (error[OVERLOAD          ]) ROS_ERROR(" * servo id [%d] has OVERLOAD error",           id);
+        }
     }
     return true;
 }
@@ -95,7 +107,7 @@ bool DynamixelHandler::SyncReadHardwareError(){
  * @brief 指定した範囲のコマンド値を書き込む
  * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
 */
-void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ return SyncWriteCmdValues( {target} ); }
+void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ set<CmdValues> t = {target} ; return SyncWriteCmdValues( t ); } 
 void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
     if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
     const CmdValues start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
@@ -110,14 +122,14 @@ void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
         const auto dp = cmd_dp_list[cmd];
         target_cmd_dp_list.push_back(dp); 
         for (int id : id_list_) if ( series_[id]==SERIES_X ) {
-            if ( !is_updated_[id] ) continue; // 更新されていない場合はスキップ
+            if ( !is_cmd_updated_[id] ) continue; // 更新されていない場合はスキップ
             id_data_vec_map[id].push_back( dp.val2pulse( cmd_values_[id][cmd], model_[id]) );
         }
     }
-    for (int id : id_list_) if ( series_[id]==SERIES_X ) is_updated_[id] = false;
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) is_cmd_updated_[id] = false;
 
     //id_data_vec_mapの中身を確認
-    if ( varbose_write_ ) {
+    if ( varbose_write_cmd_ ) {
         ROS_INFO("SyncWriteCmdValues: %d servo(s) will be written", (int)id_data_vec_map.size());
         for ( auto pair : id_data_vec_map ) {
             ROS_INFO("  * servo id [%d] will be written", pair.first);
@@ -133,7 +145,7 @@ void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
  * @param list_read_state 読み込む状態値のEnumのリスト
  * @return 読み込みに成功したかどうか
 */
-bool DynamixelHandler::SyncReadStateValues(StateValues target){ return SyncReadStateValues( {target} ); }
+bool DynamixelHandler::SyncReadStateValues(StateValues target){ set<StateValues> t = {target} ; return SyncReadStateValues( t ); }
 bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     if ( list_read_state.empty() ) return false; // 空なら何もしない
     const StateValues start = *min_element(list_read_state.begin(), list_read_state.end());
@@ -146,24 +158,29 @@ bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     vector<uint8_t> target_id_list;
     for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
 
-    auto id_data_vec_map = use_fast_read_ ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
-                                          : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
-    // エラー処理
-    if ( varbose_read_error_ && id_data_vec_map.size() < target_id_list.size()){
+    auto id_data_vec_map = (use_fast_read_&& !was_timeout_read_state_) //  fast readを使う設定かつ，直前でタイムアウトしていない場合はfast readを使う
+        ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
+        : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
+    was_timeout_read_state_ = dyn_comm_.timeout_last_read();
+    has_any_hardware_error_ = dyn_comm_.hardware_error_last_read();
+
+    // 通信エラーの表示
+    if ( varbose_read_st_err_ ) if ( id_data_vec_map.size() < target_id_list.size()) {
         ROS_WARN("SyncReadStateValues: %d servo(s) failed to read", (int)(target_id_list.size() - id_data_vec_map.size()));
         for ( auto id : target_id_list )
             if ( id_data_vec_map.find(id) == id_data_vec_map.end() ) 
                 ROS_WARN("  * servo id [%d] failed to read", id);
     }
     // id_data_vec_mapの中身を確認
-    if ( varbose_read_ ) {
+    if ( varbose_read_st_ ) {
         ROS_INFO("SyncReadStateValues: %d servo(s) are read", (int)id_data_vec_map.size());
         for ( auto pair : id_data_vec_map ) {
             ROS_INFO("  * servo id [%d] is read", pair.first);
             for ( auto data : pair.second ) ROS_INFO("    - %d", (int)data);
         }
+        if (has_any_hardware_error_) ROS_WARN("SyncReadStateValues: Hardware Error are detected");
     }
-    
+    // state_values_に反映
     for (int i = 0; i <= end-start; i++) {
         const auto dp = target_state_dp_list[i];
         for (auto pair : id_data_vec_map) {
@@ -176,7 +193,7 @@ bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
-void DynamixelHandler::CallBackDxlCmdFree(const dynamixel_handler::DynamixelCmdFree& msg) {
+void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::DynamixelCommandFree& msg) {
     if (msg.command == "reboot") { 
         for (auto id : msg.id_list) ClearHardwareError(id);
         if (msg.id_list.size() == 0) for (auto id : id_list_) ClearHardwareError(id);

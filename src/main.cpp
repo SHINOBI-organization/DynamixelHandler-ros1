@@ -104,9 +104,10 @@ bool DynamixelHandler::Initialize(){
     // ROS_INFO("=======================");
 
     // id_listの作成
-    int num_expexted, id_max;
-    if (!nh_p.getParam("dyn_num_chained_servo",    num_expexted)) num_expexted = 0; // 0のときはチェックしない
-    if (!nh_p.getParam("dyn_search_max_id",        id_max      )) id_max       = 35;
+    int num_expexted, id_max; bool do_clean_hwerr;
+    if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
+    if (!nh_p.getParam("init_expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
+    if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
     ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
     auto num_found = ScanDynamixels(id_max);
     if( num_found==0 ) {
@@ -125,16 +126,20 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("error_read_ratio",  error_pub_ratio_ )) error_pub_ratio_  =  100;
     if (!nh_p.getParam("use_slipt_read",    use_slipt_read_)) use_slipt_read_   =  false;
     if (!nh_p.getParam("use_fast_read",     use_fast_read_ )) use_fast_read_    =  true;    
-    if (!nh_p.getParam("varbose_callback",  varbose_callback_  )) varbose_callback_  =  false;
     if (!nh_p.getParam("varbose_mainloop",  varbose_mainloop_  )) varbose_mainloop_  =  false;
-    if (!nh_p.getParam("varbose_write",     varbose_write_     )) varbose_write_     =  false;
-    if (!nh_p.getParam("varbose_read",      varbose_read_      )) varbose_read_      =  false;
-    if (!nh_p.getParam("varbose_read_error",varbose_read_error_)) varbose_read_error_=  false;
+    bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp   ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
+    if (!nh_p.getParam("varbose_callback",  varbose_callback_  )) varbose_callback_  =  false;
+    if (!nh_p.getParam("varbose_write_cmd", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
+    if (!nh_p.getParam("varbose_write_cfg", varbose_write_cfg_ )) varbose_write_cfg_ =  false;
+    if (!nh_p.getParam("varbose_read_st",     varbose_read_st_     )) varbose_read_st_     =  false;
+    if (!nh_p.getParam("varbose_read_st_err", varbose_read_st_err_ )) varbose_read_st_err_ =  false;
+    if (!nh_p.getParam("varbose_read_hwerr",  varbose_read_hwerr_  )) varbose_read_hwerr_  =  false;
+    if (!nh_p.getParam("varbose_read_cfg",    varbose_read_cfg_    )) varbose_read_cfg_    =  false;
 
     //  readする情報の設定
     // todo rosparamで設定できるようにする
 
-    // 内部の情報の初期化
+    // cmd_values_の内部の情報の初期化
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
         cmd_values_[id][GOAL_PWM]             = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);    // エラー時は0
         cmd_values_[id][GOAL_CURRENT]         = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);    // エラー時は0
@@ -146,7 +151,7 @@ bool DynamixelHandler::Initialize(){
 
     // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        if ( CheckHardwareError(id) ) ClearHardwareError(id, TORQUE_DISABLE); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
+        if ( do_clean_hwerr && CheckHardwareError(id) ) ClearHardwareError(id, TORQUE_DISABLE); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
         if ( !TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
         if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
         if ( !dyn_comm_.tryWrite(profile_acceleration, id, 500)) ROS_WARN("Servo id [%d] failed to set profile_acceleration", id);
@@ -159,13 +164,13 @@ bool DynamixelHandler::Initialize(){
 }
 
 void DynamixelHandler::MainLoop(){
-    static int cnt = 0; cnt++;
+    static int cnt = -1; cnt++;
     static ros::Rate rate(loop_rate_);
 
     //* デバック
-    if (varbose_mainloop_) ROS_INFO("MainLoop [%d]", cnt);
+    if ( varbose_mainloop_ !=0 && cnt % varbose_mainloop_ == 0) ROS_INFO("MainLoop [%d]", cnt);
 
-    //* Dynamixelから状態Read & topicをPublish
+    // //* Dynamixelから状態Read & topicをPublish
     if ( state_pub_ratio_==0 || cnt % state_pub_ratio_ == 0 ) {
         bool is_suc = false;
         if ( !use_slipt_read_ )                      is_suc  = SyncReadStateValues(list_read_state_);
@@ -173,13 +178,13 @@ void DynamixelHandler::MainLoop(){
         if (is_suc) BroadcastDxlState();
     }
     if ( config_pub_ratio_!=0 && cnt % config_pub_ratio_ == 0 ) {
-        // const bool is_suc = SyncReadConfigParameter(); 
+        // const bool is_suc = SyncReadConfigParameter(); W
         // if (is_suc) BroadcastDxlConfig_Limit();
         // if (is_suc) BroadcastDxlConfig_Gain();
         // if (is_suc) BroadcastDxlConfig_Mode();
     }
-    if ( error_pub_ratio_!=0  && cnt % error_pub_ratio_ == 0 ) {
-        const bool is_suc = SyncReadHardwareError();
+    if ( error_pub_ratio_!=0  && cnt % error_pub_ratio_ == 0 && has_any_hardware_error_ ) {
+        bool is_suc = SyncReadHardwareError();
         // if (is_suc) = BroadcastDxlError();
     }
 

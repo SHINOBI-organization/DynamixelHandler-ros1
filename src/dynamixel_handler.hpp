@@ -96,22 +96,25 @@ class DynamixelHandler {
         static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
         static bool CheckHardwareError(uint8_t servo_id);
 
-        // フラグとパラメータ
+        //* 各種のフラグとパラメータ
         static inline int  loop_rate_    = 50;
         static inline int  state_pub_ratio_  = 1; 
         static inline int  config_pub_ratio_ = 100; // 0の時は初回のみ
         static inline int  error_pub_ratio_  = 100;
         static inline bool use_slipt_read_  = false;
         static inline bool use_fast_read_   = false;
+        static inline int  varbose_mainloop_  = false;
         static inline bool varbose_callback_  = false;
-        static inline bool varbose_mainloop_  = false;
-        static inline bool varbose_write_     = false;
-        static inline bool varbose_read_      = false;
-        static inline bool varbose_read_error_= false;
-        // Dynamixelとの通信
+        static inline bool varbose_write_cmd_ = false;
+        static inline bool varbose_write_cfg_ = false;
+        static inline bool varbose_read_st_     = false;
+        static inline bool varbose_read_st_err_ = false;
+        static inline bool varbose_read_hwerr_  = false;
+        static inline bool varbose_read_cfg_    = false;
+        //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
-        // 連結しているDynamixelの情報を保持する変数
-        enum CmdValues {
+        //* Dynamixelを扱うための変数群 
+        enum CmdValues { //　cmd_values_のIndex, サーボに毎周期で書き込むことができる値
             GOAL_PWM             = 0,
             GOAL_CURRENT         = 1,
             GOAL_VELOCITY        = 2,
@@ -119,7 +122,7 @@ class DynamixelHandler {
             PROFILE_VELOCITY     = 4,
             GOAL_POSITION        = 5,
         };
-        enum StateValues {
+        enum StateValues { // state_values_のIndex, サーボから毎周期で読み込むことができる値
             PRESENT_PWM          = 0,
             PRESENT_CURRENT      = 1,
             PRESENT_VELOCITY     = 2,
@@ -129,21 +132,29 @@ class DynamixelHandler {
             PRESENT_INPUT_VOLTAGE= 6,
             PRESENT_TEMPERTURE   = 7,
         };
+        enum HardwareErrors { // hardware_error_のIndex, サーボが起こしたハードウェアエラー
+            INPUT_VOLTAGE      = 0, // HARDWARE_ERROR_INPUT_VOLTAGE     
+            MOTOR_HALL_SENSOR  = 1, // HARDWARE_ERROR_MOTOR_HALL_SENSOR 
+            OVERHEATING        = 2, // HARDWARE_ERROR_OVERHEATING       
+            MOTOR_ENCODER      = 3, // HARDWARE_ERROR_MOTOR_ENCODER     
+            ELECTRONICAL_SHOCK = 4, // HARDWARE_ERROR_ELECTRONICAL_SHOCK
+            OVERLOAD           = 5, // HARDWARE_ERROR_OVERLOAD          
+        };
+        // 連結したサーボの基本情報
         static inline vector<uint8_t> id_list_; // chained dynamixel id list
         static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
         static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
-        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と コマンドとして書き込む値 のマップ
-        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と 状態として常時読み込む値 のマップ
-        static inline map<uint8_t, bool> is_updated_; // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
+        // 連結しているサーボの個々の状態を保持するmap
+        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValuesに対応する
+        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStateValuesに対応する
+        static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHardwareErrorsに対応する
+        // 上記の変数を適切に使うための補助的なフラグ
+        static inline map<uint8_t, bool> is_cmd_updated_; // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
+        static inline bool has_any_hardware_error_ = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
+        static inline bool was_timeout_read_state_ = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
+        // 各周期で実行するserial通信の内容を決めるためのset
         static inline set<CmdValues>   list_wirte_cmd_  = {};
-        static inline set<StateValues> list_read_state_ = {PRESENT_PWM
-,PRESENT_CURRENT      
-,PRESENT_VELOCITY     
-,PRESENT_POSITION     
-,VELOCITY_TRAJECTORY  
-,POSITION_TRAJECTORY  
-,PRESENT_INPUT_VOLTAGE
-,PRESENT_TEMPERTURE   };
+        static inline set<StateValues> list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValues target);
         static void SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
@@ -151,8 +162,7 @@ class DynamixelHandler {
         static bool SyncReadStateValues(set<StateValues>& list_read_state=list_read_state_);
         static bool SyncReadHardwareError();
 
-        // その他
-        static inline bool has_hardware_error = false;
+
 };
 
 namespace dyn_x{

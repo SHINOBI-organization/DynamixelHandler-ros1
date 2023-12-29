@@ -9,26 +9,29 @@
         <param name="dyn_comm_varbose"        value="false"/>
 
         <!-- サーボの初期設定 -->
-        <param name="dyn_num_chained_servo"   value="12"/>
-        <param name="dyn_search_max_id"       value="35"/>
+        <param name="init_expected_servo_num"        value="12"/>
+        <param name="init_auto_search_max_id"        value="35"/>
+        <param name="init_hardware_error_auto_clean" value="true"/>
 
         <!-- ループの設定 -->
         <param name="loop_rate" value="100"/>
-        <param name="state_read_ratio"  value="1"/> 
+        <param name="state_read_ratio"  value="3"/> 
         <param name="config_read_ratio" value="0"/>   <!-- 0=初回のみconfigを読み取る -->
-        <param name="error_read_ratio"  value="100"/> <!-- 100ループに一回 Hardware errorを読み取る -->
+        <param name="error_read_ratio"  value="1000"/> <!-- 100ループに一回 Hardware errorを読み取る -->
         
         <!-- Read方式 -->
         <param name="use_fast_read"  value="false"/>
         <param name="use_slipt_read" value="false"/>
         
         <!-- デバック用 -->
-        <param name="varbose_callback"   value="false"/>
-        <param name="varbose_mainloop"   value="false"/>
-        <param name="varbose_write"      value="false"/>
-        <param name="varbose_read"       value="false"/>
-        <param name="varbose_read_error" value="true"/>
-
+        <param name="varbose_callback"    value="false"/>
+        <param name="varbose_mainloop"    value="100"/>
+        <param name="varbose_write_cmd"   value="false"/>
+        <param name="varbose_write_cfg"   value="false"/>
+        <param name="varbose_read_st"     value="false"/>
+        <param name="varbose_read_st_err" value="true"/>
+        <param name="varbose_read_hwerr"  value="true"/>
+        <param name="varbose_read_cfg"    value="false"/>
   </node>
 
 </launch>
