@@ -95,6 +95,7 @@ bool DynamixelHandler::SyncReadHardwareError(){
  * @brief 指定した範囲のコマンド値を書き込む
  * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
 */
+void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ return SyncWriteCmdValues( {target} ); }
 void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
     if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
     const CmdValues start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
@@ -116,20 +117,14 @@ void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
     for (int id : id_list_) if ( series_[id]==SERIES_X ) is_updated_[id] = false;
 
     //id_data_vec_mapの中身を確認
-    if ( varbose_ ) {
+    if ( varbose_write_ ) {
         ROS_INFO("SyncWriteCmdValues: %d servo(s) will be written", (int)id_data_vec_map.size());
         for ( auto pair : id_data_vec_map ) {
-            const uint8_t id = pair.first;
-            const vector<int64_t> data_vec = pair.second;
-            ROS_INFO("  * servo id [%d] will be written", id);
-            for ( auto data : data_vec ) ROS_INFO("    - %d", (int)data);
+            ROS_INFO("  * servo id [%d] will be written", pair.first);
+            for ( auto data : pair.second ) ROS_INFO("    - %d", (int)data);
         }
     }
     dyn_comm_.SyncWrite(target_cmd_dp_list, id_data_vec_map);
-}
-void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ 
-    set<CmdValues> tmp{target};
-    return SyncWriteCmdValues( tmp ); 
 }
 
 /**
@@ -138,6 +133,7 @@ void DynamixelHandler::SyncWriteCmdValues(CmdValues target){
  * @param list_read_state 読み込む状態値のEnumのリスト
  * @return 読み込みに成功したかどうか
 */
+bool DynamixelHandler::SyncReadStateValues(StateValues target){ return SyncReadStateValues( {target} ); }
 bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     if ( list_read_state.empty() ) return false; // 空なら何もしない
     const StateValues start = *min_element(list_read_state.begin(), list_read_state.end());
@@ -153,11 +149,19 @@ bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     auto id_data_vec_map = use_fast_read_ ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
                                           : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
     // エラー処理
-    if ( varbose_ && id_data_vec_map.size() < target_id_list.size()){
+    if ( varbose_read_error_ && id_data_vec_map.size() < target_id_list.size()){
         ROS_WARN("SyncReadStateValues: %d servo(s) failed to read", (int)(target_id_list.size() - id_data_vec_map.size()));
         for ( auto id : target_id_list )
             if ( id_data_vec_map.find(id) == id_data_vec_map.end() ) 
                 ROS_WARN("  * servo id [%d] failed to read", id);
+    }
+    // id_data_vec_mapの中身を確認
+    if ( varbose_read_ ) {
+        ROS_INFO("SyncReadStateValues: %d servo(s) are read", (int)id_data_vec_map.size());
+        for ( auto pair : id_data_vec_map ) {
+            ROS_INFO("  * servo id [%d] is read", pair.first);
+            for ( auto data : pair.second ) ROS_INFO("    - %d", (int)data);
+        }
     }
     
     for (int i = 0; i <= end-start; i++) {
@@ -171,11 +175,6 @@ bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
 
     return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
-bool DynamixelHandler::SyncReadStateValues(StateValues target){ 
-    set<StateValues> tmp{target};
-    return SyncReadStateValues( tmp ); 
-}
-
 
 void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmdFree& msg) {
     if (msg.command == "reboot") { 
@@ -194,7 +193,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Position(const dynamixel_handler::Dyna
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
-    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_Position");
+    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_Position");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg) {
@@ -207,7 +206,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::Dyna
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_VELOCITY);
     }
-    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_Velocity");
+    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_Velocity");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg) {
@@ -220,7 +219,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::Dynam
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
     }
-    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_Current");
+    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_Current");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg) {
@@ -244,7 +243,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handle
             list_wirte_cmd_.insert(GOAL_CURRENT);
         }
     }
-    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_CurrentPosition");
+    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_CurrentPosition");
 }
 
 void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg) {
@@ -259,7 +258,7 @@ void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handl
         cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
-    if (varbose_) ROS_INFO("CallBackOfDxlCmd_X_ExtendedPosition");
+    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_ExtendedPosition");
 }
 
 void DynamixelHandler::BroadcastDynamixelState(){

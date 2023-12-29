@@ -27,11 +27,81 @@ bool DynamixelHandler::Initialize(){
         return false;
     }
 
+    // serial通信のvarbose設定
+    bool serial_varbose;
+    if (!nh_p.getParam("dyn_comm_varbose", serial_varbose)) serial_varbose = false;
+    dyn_comm_.set_varbose(serial_varbose);
+
     // serial通信のretry設定
     int num_try, msec_interval;
     if (!nh_p.getParam("dyn_comm_retry_num",     num_try      )) num_try       = 5;
     if (!nh_p.getParam("dyn_comm_inerval_msec",  msec_interval)) msec_interval = 10;
     dyn_comm_.set_retry_config(num_try, msec_interval);
+
+    // ROS_INFO("=======================");
+    
+    // int64_t tmp3= dyn_comm_.Read(profile_acceleration, 32);
+    // ROS_INFO("%d", (int)tmp3);
+    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
+    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
+    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
+
+    // vector<int64_t> tmp2= dyn_comm_.Read({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, 32);
+    // for (auto val : tmp2) ROS_INFO("  %d", (int)val);
+    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
+    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
+    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
+
+
+    // auto tmp4 = dyn_comm_.SyncRead_fast(profile_acceleration, {32, 33});
+    // for (auto pair : tmp4) {
+    //     ROS_INFO("id: %d", (int)pair.first);
+    //     ROS_INFO(" - %d", (int)pair.second);
+    // }
+    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
+    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
+    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
+
+
+    // auto tmp = dyn_comm_.SyncRead_fast({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, {32, 33});
+    // for (auto pair : tmp) {
+    //     ROS_INFO("id: %d", (int)pair.first);
+    //     for (auto val : pair.second) {
+    //         ROS_INFO(" - %d", (int)val);
+    //     }
+    // }
+    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
+    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
+    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
+
+
+    // ROS_INFO("=======================");
+
+    // dyn_comm_.Write(profile_acceleration, 32, 100);
+    // int64_t tmp31= dyn_comm_.Read(profile_acceleration, 32);
+    // ROS_INFO("%d", (int)tmp31);
+
+    // dyn_comm_.Write({goal_velocity, profile_acceleration, profile_velocity, goal_position}, 32, {10, 20, 30, 40});
+    // vector<int64_t> tmp21= dyn_comm_.Read({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, 32);
+    // for (auto val : tmp21) ROS_INFO("  %d", (int)val);
+
+    // dyn_comm_.SyncWrite(profile_acceleration, {32, 33}, {100, 200});
+    // auto tmp41 = dyn_comm_.SyncRead(profile_acceleration, {32, 33});
+    // for (auto pair : tmp41) {
+    //     ROS_INFO("id: %d", (int)pair.first);
+    //     ROS_INFO(" - %d", (int)pair.second);
+    // }
+
+    // dyn_comm_.SyncWrite({goal_velocity ,profile_acceleration, profile_velocity, goal_position}, {{32, {11, 21, 31, 41}}, {33, {12, 22, 32, 32}}});
+    // auto tmp11 = dyn_comm_.SyncRead({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, {32, 33});
+    // for (auto pair : tmp11) {
+    //     ROS_INFO("id: %d", (int)pair.first);
+    //     for (auto val : pair.second) {
+    //         ROS_INFO(" - %d", (int)val);
+    //     }
+    // }
+    
+    // ROS_INFO("=======================");
 
     // id_listの作成
     int num_expexted, id_max;
@@ -49,11 +119,17 @@ bool DynamixelHandler::Initialize(){
     }
 
     // main loop の設定
-    if (!nh_p.getParam("varbose",          varbose_   )) varbose_   =  false;
     if (!nh_p.getParam("loop_rate",        loop_rate_ )) loop_rate_ =  50;
-    if (!nh_p.getParam("state_read_ratio",  state_pub_ratio_  )) state_pub_ratio_  =  1;
-    if (!nh_p.getParam("config_read_ratio", config_pub_ratio_ )) config_pub_ratio_ =  0;
-    if (!nh_p.getParam("error_read_ratio",  error_pub_ratio_  )) error_pub_ratio_  =  100;
+    if (!nh_p.getParam("state_read_ratio",  state_pub_ratio_ )) state_pub_ratio_  =  1;
+    if (!nh_p.getParam("config_read_ratio", config_pub_ratio_)) config_pub_ratio_ =  0;
+    if (!nh_p.getParam("error_read_ratio",  error_pub_ratio_ )) error_pub_ratio_  =  100;
+    if (!nh_p.getParam("use_slipt_read",    use_slipt_read_)) use_slipt_read_   =  false;
+    if (!nh_p.getParam("use_fast_read",     use_fast_read_ )) use_fast_read_    =  true;    
+    if (!nh_p.getParam("varbose_callback",  varbose_callback_  )) varbose_callback_  =  false;
+    if (!nh_p.getParam("varbose_mainloop",  varbose_mainloop_  )) varbose_mainloop_  =  false;
+    if (!nh_p.getParam("varbose_write",     varbose_write_     )) varbose_write_     =  false;
+    if (!nh_p.getParam("varbose_read",      varbose_read_      )) varbose_read_      =  false;
+    if (!nh_p.getParam("varbose_read_error",varbose_read_error_)) varbose_read_error_=  false;
 
     //  readする情報の設定
     // todo rosparamで設定できるようにする
@@ -72,7 +148,7 @@ bool DynamixelHandler::Initialize(){
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         if ( CheckHardwareError(id) ) ClearHardwareError(id, TORQUE_DISABLE); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
         if ( !TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
-        if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_EXTENDED_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
+        if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
         if ( !dyn_comm_.tryWrite(profile_acceleration, id, 500)) ROS_WARN("Servo id [%d] failed to set profile_acceleration", id);
         if ( !dyn_comm_.tryWrite(profile_velocity, id, 100)) ROS_WARN("Servo id [%d] failed to set profile_velocity", id);
         if ( !dyn_comm_.tryWrite(homing_offset, id, 0)) ROS_WARN("Servo id [%d] failed to set homing_offset", id);
@@ -87,7 +163,7 @@ void DynamixelHandler::MainLoop(){
     static ros::Rate rate(loop_rate_);
 
     //* デバック
-    // if (varbose_) ShowDynamixelChain();
+    if (varbose_mainloop_) ROS_INFO("MainLoop [%d]", cnt);
 
     //* Dynamixelから状態Read & topicをPublish
     if ( state_pub_ratio_==0 || cnt % state_pub_ratio_ == 0 ) {

@@ -1,15 +1,34 @@
 <launch>
 
   <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
-      <param name="DEVICE_NAME" value="/dev/ttyUSB0"/>
-      <param name="BAUDRATE" value="1000000"/>
-      <param name="loop_rate" value="100"/>
-      <param name="varbose" value="false"/>
-      <param name="dyn_num_chained_servo"   value="12"/>
-      <param name="dyn_search_max_id"       value="35"/>
-      <param name="dyn_comm_retry_num"      value="3"/>
-      <param name="dyn_comm_inerval_msec"   value="5"/>
-      <param name="error_read_ratio" value="100"/> <!-- 100ループに一回 Hardware errorを読み取る -->
+        <!-- 通信の設定 -->
+        <param name="DEVICE_NAME" value="/dev/ttyUSB0"/>
+        <param name="BAUDRATE" value="1000000"/>
+        <param name="dyn_comm_retry_num"      value="3"/>
+        <param name="dyn_comm_inerval_msec"   value="5"/>
+        <param name="dyn_comm_varbose"        value="false"/>
+
+        <!-- サーボの初期設定 -->
+        <param name="dyn_num_chained_servo"   value="12"/>
+        <param name="dyn_search_max_id"       value="35"/>
+
+        <!-- ループの設定 -->
+        <param name="loop_rate" value="100"/>
+        <param name="state_read_ratio"  value="1"/> 
+        <param name="config_read_ratio" value="0"/>   <!-- 0=初回のみconfigを読み取る -->
+        <param name="error_read_ratio"  value="100"/> <!-- 100ループに一回 Hardware errorを読み取る -->
+        
+        <!-- Read方式 -->
+        <param name="use_fast_read"  value="false"/>
+        <param name="use_slipt_read" value="false"/>
+        
+        <!-- デバック用 -->
+        <param name="varbose_callback"   value="false"/>
+        <param name="varbose_mainloop"   value="false"/>
+        <param name="varbose_write"      value="false"/>
+        <param name="varbose_read"       value="false"/>
+        <param name="varbose_read_error" value="true"/>
+
   </node>
 
 </launch>

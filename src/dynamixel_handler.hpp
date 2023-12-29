@@ -80,9 +80,13 @@ class DynamixelHandler {
         static inline int  state_pub_ratio_  = 1; 
         static inline int  config_pub_ratio_ = 100; // 0の時は初回のみ
         static inline int  error_pub_ratio_  = 100;
-        static inline bool varbose_      = false;
         static inline bool use_slipt_read_  = false;
-        static inline bool use_fast_read_   = true;
+        static inline bool use_fast_read_   = false;
+        static inline bool varbose_callback_  = false;
+        static inline bool varbose_mainloop_  = false;
+        static inline bool varbose_write_     = false;
+        static inline bool varbose_read_      = false;
+        static inline bool varbose_read_error_= false;
         // Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
         // 連結しているDynamixelの情報を保持する変数
@@ -111,7 +115,14 @@ class DynamixelHandler {
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と 状態として常時読み込む値 のマップ
         static inline map<uint8_t, bool> is_updated_; // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
         static inline set<CmdValues>   list_wirte_cmd_  = {};
-        static inline set<StateValues> list_read_state_ = {PRESENT_POSITION, PRESENT_VELOCITY};
+        static inline set<StateValues> list_read_state_ = {PRESENT_PWM
+,PRESENT_CURRENT      
+,PRESENT_VELOCITY     
+,PRESENT_POSITION     
+,VELOCITY_TRAJECTORY  
+,POSITION_TRAJECTORY  
+,PRESENT_INPUT_VOLTAGE
+,PRESENT_TEMPERTURE   };
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValues target);
         static void SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
