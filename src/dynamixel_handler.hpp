@@ -5,13 +5,19 @@
 #include <std_msgs/String.h>
 
 #include "dynamixel_communicator.h"
+#include <dynamixel_handler/DynamixelState.h>
+#include <dynamixel_handler/DynamixelStateFree.h>
+#include <dynamixel_handler/DynamixelError.h>
+#include <dynamixel_handler/DynamixelConfig_Limit.h>
+#include <dynamixel_handler/DynamixelConfig_Gain.h>
+#include <dynamixel_handler/DynamixelConfig_Mode.h>
 #include <dynamixel_handler/DynamixelCmdFree.h>
+#include <dynamixel_handler/DynamixelCmd_Option.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlPosition.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlVelocity.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlCurrent.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlCurrentPosition.h>
 #include <dynamixel_handler/DynamixelCmd_X_ControlExtendedPosition.h>
-#include <dynamixel_handler/DynamixelState.h>
 
 #include <thread>
 using std::this_thread::sleep_for;
@@ -49,16 +55,31 @@ class DynamixelHandler {
         static bool Initialize();
         static void MainLoop();
         //* ROS publishを担う関数と subscliber callback関数
-        static void BroadcastDynamixelState();
-        static void CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmdFree& msg);
-        static void CallBackOfDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
-        static void CallBackOfDxlCmd_X_Velocity        (const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg);
-        static void CallBackOfDxlCmd_X_Current         (const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg);
-        static void CallBackOfDxlCmd_X_CurrentPosition (const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg);
-        static void CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg);
+        static void BroadcastDxlState();
+        static void BroadcastDxlStateFree();
+        static void BroadcastDxlError();
+        static void BroadcastDxlConfig_Limit();
+        static void BroadcastDxlConfig_Gain();
+        static void BroadcastDxlConfig_Mode();
+        static void CallBackDxlConfig_Limit (const dynamixel_handler::DynamixelConfig_Limit& msg);
+        static void CallBackDxlConfig_Gain  (const dynamixel_handler::DynamixelConfig_Gain& msg);
+        static void CallBackDxlConfig_Mode  (const dynamixel_handler::DynamixelConfig_Mode& msg);
+        static void CallBackDxlCmdFree    (const dynamixel_handler::DynamixelCmdFree& msg);
+        static void CallBackDxlCmd_Option (const dynamixel_handler::DynamixelCmd_Option& msg);
+        static void CallBackDxlCmd_X_Position        (const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg);
+        static void CallBackDxlCmd_X_Velocity        (const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg);
+        static void CallBackDxlCmd_X_Current         (const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg);
+        static void CallBackDxlCmd_X_CurrentPosition (const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg);
+        static void CallBackDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg);
         //* ROS publisher subscriber instance
         static inline ros::Publisher  pub_state_;
+        static inline ros::Publisher  pub_state_free_;
+        static inline ros::Publisher  pub_error_;
+        static inline ros::Publisher  pub_config_limit_;
+        static inline ros::Publisher  pub_config_gain_;
+        static inline ros::Publisher  pub_config_mode_;
         static inline ros::Subscriber sub_cmd_free_;
+        static inline ros::Subscriber sub_cmd_option_;
         static inline ros::Subscriber sub_cmd_x_pos_;
         static inline ros::Subscriber sub_cmd_x_vel_;
         static inline ros::Subscriber sub_cmd_x_cur_;

@@ -1,5 +1,5 @@
 time stamp
-uint8[]  id_list
+uint16[]  id_list
 
 float64[] homing_offset__deg
 float64[] moving_threshold__deg_s

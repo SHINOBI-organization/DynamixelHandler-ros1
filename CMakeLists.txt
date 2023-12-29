@@ -58,10 +58,13 @@ add_message_files(
 
   DynamixelState.msg
 
-  DynamixelConfig_Gains.msg
-  DynamixelConfig_Limits.msg
+  DynamixelConfig_Gain.msg
+  DynamixelConfig_Limit.msg
+  DynamixelConfig_Mode.msg
+
+  DynamixelError.msg
     
-  DynamixelCmd_Options.msg
+  DynamixelCmd_Option.msg
   DynamixelCmd_X_ControlCurrent.msg
   DynamixelCmd_X_ControlCurrentPosition.msg
   DynamixelCmd_X_ControlExtendedPosition.msg

@@ -1,5 +1,4 @@
-time stamp
-uint8[] id_list
+uint16[] id_list
 
 float64[] current__mA
 float64[] position__deg

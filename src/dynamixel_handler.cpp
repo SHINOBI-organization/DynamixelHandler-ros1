@@ -176,14 +176,14 @@ bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
     return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
-void DynamixelHandler::CallBackOfDynamixelCommand(const dynamixel_handler::DynamixelCmdFree& msg) {
+void DynamixelHandler::CallBackDxlCmdFree(const dynamixel_handler::DynamixelCmdFree& msg) {
     if (msg.command == "reboot") { 
         for (auto id : msg.id_list) ClearHardwareError(id);
         if (msg.id_list.size() == 0) for (auto id : id_list_) ClearHardwareError(id);
     }
 }
 
-void DynamixelHandler::CallBackOfDxlCmd_X_Position(const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg) {
+void DynamixelHandler::CallBackDxlCmd_X_Position(const dynamixel_handler::DynamixelCmd_X_ControlPosition& msg) {
     if ( msg.id_list.size() != msg.position__deg.size() ) return;
 
     for (int i = 0; i < msg.id_list.size(); i++) {
@@ -193,10 +193,10 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Position(const dynamixel_handler::Dyna
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
-    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_Position");
+    if (varbose_callback_) ROS_INFO("CallBackDxlCmd_X_Position");
 }
 
-void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg) {
+void DynamixelHandler::CallBackDxlCmd_X_Velocity(const dynamixel_handler::DynamixelCmd_X_ControlVelocity& msg) {
     if ( msg.id_list.size() != msg.velocity__deg_s.size() ) return;
 
     for (int i = 0; i < msg.id_list.size(); i++) {
@@ -206,10 +206,10 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Velocity(const dynamixel_handler::Dyna
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_VELOCITY);
     }
-    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_Velocity");
+    if (varbose_callback_) ROS_INFO("CallBackDxlCmd_X_Velocity");
 }
 
-void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg) {
+void DynamixelHandler::CallBackDxlCmd_X_Current(const dynamixel_handler::DynamixelCmd_X_ControlCurrent& msg) {
     if ( msg.id_list.size() != msg.current__mA.size() ) return;
 
     for (int i = 0; i < msg.id_list.size(); i++) {
@@ -219,10 +219,10 @@ void DynamixelHandler::CallBackOfDxlCmd_X_Current(const dynamixel_handler::Dynam
         is_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
     }
-    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_Current");
+    if (varbose_callback_) ROS_INFO("CallBackDxlCmd_X_Current");
 }
 
-void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg) {
+void DynamixelHandler::CallBackDxlCmd_X_CurrentPosition(const dynamixel_handler::DynamixelCmd_X_ControlCurrentPosition& msg) {
     if ( !msg.current__mA.empty()   && msg.id_list.size() != msg.current__mA.size()  ) return; // 空なら無視するのでOK, 空でないならサイズ一致が必要
     if ( !msg.position__deg.empty() && msg.id_list.size() != msg.position__deg.size()) return; // なので，空でなくかつサイズ不一致はスキップする
     if ( !msg.rotation.empty()      && msg.id_list.size() != msg.rotation.size()     ) return;
@@ -243,10 +243,10 @@ void DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition(const dynamixel_handle
             list_wirte_cmd_.insert(GOAL_CURRENT);
         }
     }
-    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_CurrentPosition");
+    if (varbose_callback_) ROS_INFO("CallBackDxlCmd_X_CurrentPosition");
 }
 
-void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg) {
+void DynamixelHandler::CallBackDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCmd_X_ControlExtendedPosition& msg) {
     if ( !msg.position__deg.empty() && msg.id_list.size() != msg.position__deg.size()) return; // 空なら無視するのでOK, 空でないならサイズ一致が必要
     if ( !msg.rotation.empty()     && msg.id_list.size() != msg.rotation.size()      ) return; // なので，空でなくかつサイズ不一致はスキップする
 
@@ -258,10 +258,10 @@ void DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition(const dynamixel_handl
         cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
-    if (varbose_callback_) ROS_INFO("CallBackOfDxlCmd_X_ExtendedPosition");
+    if (varbose_callback_) ROS_INFO("CallBackDxlCmd_X_ExtendedPosition");
 }
 
-void DynamixelHandler::BroadcastDynamixelState(){
+void DynamixelHandler::BroadcastDxlState(){
     dynamixel_handler::DynamixelState msg;
     for (auto id : id_list_) {
         msg.id_list.push_back(id);

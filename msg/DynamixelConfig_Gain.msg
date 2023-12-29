@@ -1,5 +1,5 @@
 time stamp
-uint8[]  id_list
+uint16[]  id_list
 
 uint16[] velocity_i_gain__pulse
 uint16[] velocity_p_gain__pulse

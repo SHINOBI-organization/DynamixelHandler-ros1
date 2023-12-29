@@ -8,12 +8,12 @@ bool DynamixelHandler::Initialize(){
     ros::NodeHandle nh_p("~");
 
     // Subscriber / Publisherの設定
-    sub_cmd_free_  = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackOfDynamixelCommand);
-    sub_cmd_x_pos_ = nh.subscribe("/dynamixel/x_cmd/position", 10, DynamixelHandler::CallBackOfDxlCmd_X_Position);
-    sub_cmd_x_vel_ = nh.subscribe("/dynamixel/x_cmd/velocity", 10, DynamixelHandler::CallBackOfDxlCmd_X_Velocity);
-    sub_cmd_x_cur_ = nh.subscribe("/dynamixel/x_cmd/current",  10, DynamixelHandler::CallBackOfDxlCmd_X_Current);
-    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/x_cmd/current_position",  10, DynamixelHandler::CallBackOfDxlCmd_X_CurrentPosition);
-    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/x_cmd/extended_position", 10, DynamixelHandler::CallBackOfDxlCmd_X_ExtendedPosition);
+    sub_cmd_free_  = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackDxlCmdFree);
+    sub_cmd_x_pos_ = nh.subscribe("/dynamixel/x_cmd/position", 10, DynamixelHandler::CallBackDxlCmd_X_Position);
+    sub_cmd_x_vel_ = nh.subscribe("/dynamixel/x_cmd/velocity", 10, DynamixelHandler::CallBackDxlCmd_X_Velocity);
+    sub_cmd_x_cur_ = nh.subscribe("/dynamixel/x_cmd/current",  10, DynamixelHandler::CallBackDxlCmd_X_Current);
+    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/x_cmd/current_position",  10, DynamixelHandler::CallBackDxlCmd_X_CurrentPosition);
+    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/x_cmd/extended_position", 10, DynamixelHandler::CallBackDxlCmd_X_ExtendedPosition);
 
     pub_state_ = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
 
@@ -170,15 +170,17 @@ void DynamixelHandler::MainLoop(){
         bool is_suc = false;
         if ( !use_slipt_read_ )                      is_suc  = SyncReadStateValues(list_read_state_);
         else for (StateValues st : list_read_state_) is_suc += SyncReadStateValues(st);
-        if (is_suc) BroadcastDynamixelState();
+        if (is_suc) BroadcastDxlState();
     }
     if ( config_pub_ratio_!=0 && cnt % config_pub_ratio_ == 0 ) {
         // const bool is_suc = SyncReadConfigParameter(); 
-        // if (is_suc) BroadcastDynamixelConfig();
+        // if (is_suc) BroadcastDxlConfig_Limit();
+        // if (is_suc) BroadcastDxlConfig_Gain();
+        // if (is_suc) BroadcastDxlConfig_Mode();
     }
     if ( error_pub_ratio_!=0  && cnt % error_pub_ratio_ == 0 ) {
         const bool is_suc = SyncReadHardwareError();
-        // if (is_suc) = BroadcastDynamixelHardwareError();
+        // if (is_suc) = BroadcastDxlError();
     }
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
