@@ -152,8 +152,9 @@ class DynamixelHandler {
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHardwareErrorsに対応する
         // 上記の変数を適切に使うための補助的なフラグ
         static inline map<uint8_t, bool> is_cmd_updated_; // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
-        static inline bool has_any_hardware_error_ = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
-        static inline bool was_timeout_read_state_ = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
+        static inline bool has_any_hardware_error_    = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
+        static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
+        static inline bool is_timeout_read_state_    = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
         // 各周期で実行するserial通信の内容を決めるためのset
         static inline set<CmdValues>   list_wirte_cmd_  = {};
         static inline set<StateValues> list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};

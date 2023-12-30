@@ -116,14 +116,15 @@ bool DynamixelHandler::SyncReadStateValues(const set<StateValues>& list_read_sta
     vector<uint8_t> target_id_list;
     for (auto id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
 
-    auto id_data_vec_map = (use_fast_read_&& !was_timeout_read_state_) //  fast readを使う設定かつ，直前でタイムアウトしていない場合はfast readを使う
+    auto id_data_vec_map = (use_fast_read_&& !is_timeout_read_state_) //  fast readを使う設定かつ，直前でタイムアウトしていない場合はfast readを使う
         ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
         : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
-    was_timeout_read_state_ = dyn_comm_.timeout_last_read();
-    has_any_hardware_error_ = dyn_comm_.hardware_error_last_read();
+    is_timeout_read_state_     = dyn_comm_.timeout_last_read();
+    has_comm_error_read_state_ = dyn_comm_.comm_error_last_read();
+    has_any_hardware_error_    = dyn_comm_.hardware_error_last_read();
 
     // 通信エラーの表示
-    if ( varbose_read_st_err_ ) if ( has_any_hardware_error_ || was_timeout_read_state_ ) {
+    if ( varbose_read_st_err_ ) if ( has_comm_error_read_state_ || is_timeout_read_state_ ) {
         ROS_WARN("SyncReadStateValues: %d servo(s) failed to read", (int)(target_id_list.size() - id_data_vec_map.size()));
         for ( auto id : target_id_list )
             if ( id_data_vec_map.find(id) == id_data_vec_map.end() ) 

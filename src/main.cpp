@@ -172,11 +172,12 @@ void DynamixelHandler::MainLoop(){
     static ros::Rate rate(loop_rate_);
 
     //* デバック
-    static float rtime = 0.0, wtime = 0.0;
+    static float rtime = 0.0, wtime = 0.0, suc_read_part=0.0, suc_read_full=0.0, num_st_read=0.001;
     if ( varbose_mainloop_ !=0 ) 
     if ( cnt % varbose_mainloop_ == 0) {
-        ROS_INFO("MainLoop [%d]: read=%.2f ms, write=%.2f ms", cnt, rtime/varbose_mainloop_, wtime/varbose_mainloop_);
-        rtime = 0.0; wtime = 0.0;
+        ROS_INFO("Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
+            cnt, rtime/varbose_mainloop_, wtime/varbose_mainloop_, 100*suc_read_part/num_st_read, 100*suc_read_full/num_st_read);
+        rtime = 0.0; wtime = 0.0; suc_read_part=0.0; suc_read_full=0.0, num_st_read=0.001;
     }
         
     /*　処理時間時間の計測 */ auto rstart = system_clock::now();
@@ -190,6 +191,9 @@ void DynamixelHandler::MainLoop(){
             is_st_suc  = SyncReadStateValues(list_read_state_);
         else for (StateValues each_state : list_read_state_) 
             is_st_suc += SyncReadStateValues(each_state);
+        num_st_read++;
+        suc_read_part += is_st_suc;
+        suc_read_full += !(is_timeout_read_state_||has_comm_error_read_state_);
         if (is_st_suc) BroadcastDxlState();
     }
     if ( ratio_error_pub_!=0 )
