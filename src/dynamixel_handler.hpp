@@ -52,6 +52,7 @@ static double rad2deg(double rad){ return rad/DEG; }
 class DynamixelHandler {
     public:
         //* ROS 初期設定とメインループ
+        static bool TmpTest();
         static bool Initialize();
         static void MainLoop();
         //* ROS publishを担う関数と subscliber callback関数

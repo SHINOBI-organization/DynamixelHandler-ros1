@@ -3,6 +3,54 @@
 
 using namespace dyn_x;
 
+bool DynamixelHandler::TmpTest(){
+    // dyn_comm.Read(), dyn_comm.SyncRead()の結果が一致するかテストする．
+    // 一致しない場合は，dyn_comm.SyncRead()のバグが疑われる．
+
+    auto pos = dyn_comm_.SyncRead(present_position, {2, 3});
+    auto pos2 = dyn_comm_.Read(present_position, 2);
+    auto pos3 = dyn_comm_.Read(present_position, 3);
+    ROS_INFO("pos[2] = %d, pos2 = %d", (int)pos[2], (int)pos2);
+    ROS_INFO("pos[3] = %d, pos3 = %d", (int)pos[3], (int)pos3);
+
+    auto vel = dyn_comm_.SyncRead(present_velocity, {2, 3});
+    auto vel2 = dyn_comm_.Read(present_velocity, 2);
+    auto vel3 = dyn_comm_.Read(present_velocity, 3);
+    ROS_INFO("vel[2] = %d, vel2 = %d", (int)vel[2], (int)vel2);
+    ROS_INFO("vel[3] = %d, vel3 = %d", (int)vel[3], (int)vel3);
+
+    auto pos_vel = dyn_comm_.SyncRead({present_position, present_velocity}, {2, 3});
+    auto pos_vel2 = dyn_comm_.Read({present_position, present_velocity}, 2);
+    auto pos_vel3 = dyn_comm_.Read({present_position, present_velocity}, 3);
+    ROS_INFO("pos pos_vel[2] = %d, pos_vel2 = %d", (int)pos_vel[2][0], (int)pos_vel2[0]);
+    ROS_INFO("vel pos_vel[2] = %d, pos_vel2 = %d", (int)pos_vel[2][1], (int)pos_vel2[1]);
+    ROS_INFO("pos pos_vel[3] = %d, pos_vel3 = %d", (int)pos_vel[3][0], (int)pos_vel3[0]);
+    ROS_INFO("vel pos_vel[3] = %d, pos_vel3 = %d", (int)pos_vel[3][1], (int)pos_vel3[1]);
+
+    // 以下はSyncReadの代わりにSyncRead_fastを使う場合のテスト
+    auto pos_fast = dyn_comm_.SyncRead_fast(present_position, {2, 3});
+    auto pos2_fast = dyn_comm_.Read(present_position, 2);
+    auto pos3_fast = dyn_comm_.Read(present_position, 3);
+    ROS_INFO("pos_fast[2] = %d, pos2_fast = %d", (int)pos_fast[2], (int)pos2_fast);
+    ROS_INFO("pos_fast[3] = %d, pos3_fast = %d", (int)pos_fast[3], (int)pos3_fast);
+
+    auto vel_fast = dyn_comm_.SyncRead_fast(present_velocity, {2, 3});
+    auto vel2_fast = dyn_comm_.Read(present_velocity, 2);
+    auto vel3_fast = dyn_comm_.Read(present_velocity, 3);
+    ROS_INFO("vel_fast[2] = %d, vel2_fast = %d", (int)vel_fast[2], (int)vel2_fast);
+    ROS_INFO("vel_fast[3] = %d, vel3_fast = %d", (int)vel_fast[3], (int)vel3_fast);
+
+    auto pos_vel_fast = dyn_comm_.SyncRead_fast({present_position, present_velocity}, {2, 3});
+    auto pos_vel2_fast = dyn_comm_.Read({present_position, present_velocity}, 2);
+    auto pos_vel3_fast = dyn_comm_.Read({present_position, present_velocity}, 3);
+    ROS_INFO("pos pos_vel_fast[2] = %d, pos_vel2_fast = %d", (int)pos_vel_fast[2][0], (int)pos_vel2_fast[0]);
+    ROS_INFO("vel pos_vel_fast[2] = %d, pos_vel2_fast = %d", (int)pos_vel_fast[2][1], (int)pos_vel2_fast[1]);
+    ROS_INFO("pos pos_vel_fast[3] = %d, pos_vel3_fast = %d", (int)pos_vel_fast[3][0], (int)pos_vel3_fast[0]);
+    ROS_INFO("vel pos_vel_fast[3] = %d, pos_vel3_fast = %d", (int)pos_vel_fast[3][1], (int)pos_vel3_fast[1]);
+
+    return false;
+}
+
 bool DynamixelHandler::Initialize(){
     ros::NodeHandle nh;
     ros::NodeHandle nh_p("~");
@@ -43,6 +91,7 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("dyn_comm_retry_num",     num_try      )) num_try       = 5;
     if (!nh_p.getParam("dyn_comm_inerval_msec",  msec_interval)) msec_interval = 10;
     dyn_comm_.set_retry_config(num_try, msec_interval);
+    // return TmpTest();
 
     // main loop の設定
     if (!nh_p.getParam("loop_rate",        loop_rate_ )) loop_rate_ =  50;
