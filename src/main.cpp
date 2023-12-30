@@ -8,14 +8,20 @@ bool DynamixelHandler::Initialize(){
     ros::NodeHandle nh_p("~");
 
     // Subscriber / Publisherの設定
-    sub_cmd_free_  = nh.subscribe("/dynamixel/cmd",   10, DynamixelHandler::CallBackDxlCommandFree);
-    sub_cmd_x_pos_ = nh.subscribe("/dynamixel/x_cmd/position", 10, DynamixelHandler::CallBackDxlCommand_X_Position);
-    sub_cmd_x_vel_ = nh.subscribe("/dynamixel/x_cmd/velocity", 10, DynamixelHandler::CallBackDxlCommand_X_Velocity);
-    sub_cmd_x_cur_ = nh.subscribe("/dynamixel/x_cmd/current",  10, DynamixelHandler::CallBackDxlCommand_X_Current);
-    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/x_cmd/current_position",  10, DynamixelHandler::CallBackDxlCommand_X_CurrentPosition);
-    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/x_cmd/extended_position", 10, DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition);
+    sub_cmd_free_   = nh.subscribe("/dynamixel/cmd_free",   10, DynamixelHandler::CallBackDxlCommandFree);
+    sub_cmd_option_ = nh.subscribe("/dynamixel/cmd/option", 10, DynamixelHandler::CallBackDxlCommand_Option);
+    sub_cmd_x_pos_  = nh.subscribe("/dynamixel/cmd/x/position", 10, DynamixelHandler::CallBackDxlCommand_X_Position);
+    sub_cmd_x_vel_  = nh.subscribe("/dynamixel/cmd/x/velocity", 10, DynamixelHandler::CallBackDxlCommand_X_Velocity);
+    sub_cmd_x_cur_  = nh.subscribe("/dynamixel/cmd/x/current",  10, DynamixelHandler::CallBackDxlCommand_X_Current);
+    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/cmd/x/current_position",  10, DynamixelHandler::CallBackDxlCommand_X_CurrentPosition);
+    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/cmd/x/extended_position", 10, DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition);
 
-    pub_state_ = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
+    pub_state_free_   = nh.advertise<dynamixel_handler::DynamixelStateFree>("/dynamixel/state_free", 10);
+    pub_state_        = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
+    pub_error_        = nh.advertise<dynamixel_handler::DynamixelError>("/dynamixel/error", 10);
+    pub_config_limit_ = nh.advertise<dynamixel_handler::DynamixelConfig_Limit>("/dynamixel/config/limit", 10);
+    pub_config_gain_  = nh.advertise<dynamixel_handler::DynamixelConfig_Gain>("/dynamixel/config/gain", 10);
+    pub_config_mode_  = nh.advertise<dynamixel_handler::DynamixelConfig_Mode>("/dynamixel/config/mode", 10);
 
     // 通信の開始
     int BAUDRATE; string DEVICE_NAME;
@@ -62,11 +68,11 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
     ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
     auto num_found = ScanDynamixels(id_max);
-    if( num_found==0 ) {
+    if( num_found==0 ) { // 見つからなかった場合は初期化失敗で終了
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
         return false;
     }
-    if( num_expexted>0 && num_expexted!=num_found ) {
+    if( num_expexted>0 && num_expexted!=num_found ) { // 期待数が設定されているときに、見つかった数が期待数と異なる場合は初期化失敗で終了
         ROS_ERROR("Number of Dynamixel is not matched. Expected [%d], but found [%d]", num_expexted, num_found);
         return false;
     }
@@ -140,16 +146,16 @@ void DynamixelHandler::MainLoop(){
     if ( ratio_error_pub_!=0 )
     if ( has_any_hardware_error_ && cnt % ratio_error_pub_ == 0 ) { // 直前が失敗している場合 or ratio_error_pub_の割合で実行
         bool is_err_suc = SyncReadHardwareError();
-        // if (is_err_suc) = BroadcastDxlError();
+        if (is_err_suc) BroadcastDxlError();
     }
     if ( ratio_config_pub_!=0 )
     if ( cnt % ratio_config_pub_ == 0 ) { // ratio_config_pub_の割合で実行
-        // const bool is_mode_suc = SyncReadConfigParameter_Mode();
-        // if (is_mode_suc) BroadcastDxlConfig_Mode();
-        // const bool is_lim_suc = SyncReadConfigParameter_Limit();
-        // if (is_lim_suc) BroadcastDxlConfig_Limit();
-        // const bool is_gain_suc = SyncReadConfigParameter_Gain();
-        // if (is_gain_suc) BroadcastDxlConfig_Gain();
+        bool is_mode_suc = SyncReadConfigParameter_Mode();
+        if (is_mode_suc) BroadcastDxlConfig_Mode();
+        bool is_lim_suc = SyncReadConfigParameter_Limit();
+        if (is_lim_suc) BroadcastDxlConfig_Limit();
+        bool is_gain_suc = SyncReadConfigParameter_Gain();
+        if (is_gain_suc) BroadcastDxlConfig_Gain();
     }
 
     /*　処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;

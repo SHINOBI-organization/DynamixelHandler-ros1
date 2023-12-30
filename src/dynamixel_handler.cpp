@@ -40,13 +40,10 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
 
     after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
 
-    if ( dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000 ) {
-        ROS_INFO("Servo id [%d] is cleared error", id);
-        return true;
-    } else {
-        ROS_ERROR("Servo id [%d] failed to clear error", id);
-        return false;
-    }
+    bool is_clear = dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000;
+    if (is_clear) ROS_INFO ("Servo id [%d] is cleared error", id);
+    else          ROS_ERROR("Servo id [%d] failed to clear error", id);
+    return is_clear;
 }
 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
@@ -63,41 +60,6 @@ bool DynamixelHandler::TorqueEnable(uint8_t id){
 bool DynamixelHandler::TorqueDisable(uint8_t id){
     dyn_comm_.tryWrite(torque_enable, id, TORQUE_DISABLE);
     return dyn_comm_.tryRead(torque_enable, id) == TORQUE_DISABLE;
-}
-
-bool DynamixelHandler::SyncReadHardwareError(){
-    
-    auto id_error_map = dyn_comm_.SyncRead(hardware_error_status, id_list_);
-    if (dyn_comm_.timeout_last_read()   ) return false; // 読み込み失敗
-    if (dyn_comm_.comm_error_last_read()) return false; // 読み込み失敗
-
-    //  hardware_error_に反映
-    for ( auto pair : id_error_map ){
-        const uint8_t id = pair.first;
-        const uint8_t error = pair.second;
-        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) hardware_error_[id][INPUT_VOLTAGE     ] = true;
-        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) hardware_error_[id][MOTOR_HALL_SENSOR ] = true;
-        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) hardware_error_[id][OVERHEATING       ] = true;
-        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) hardware_error_[id][MOTOR_ENCODER     ] = true;
-        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) hardware_error_[id][ELECTRONICAL_SHOCK] = true;
-        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) hardware_error_[id][OVERLOAD          ] = true;
-    }
-
-    // コンソールへの表示
-    if ( varbose_read_hwerr_ ) {
-        ROS_WARN("SyncReadHardwareError: Hardware error are Checked");
-        for (auto pair : hardware_error_) {
-            uint8_t id = pair.first;
-            auto error = pair.second;
-            if (error[INPUT_VOLTAGE     ]) ROS_ERROR(" * servo id [%d] has INPUT_VOLTAGE error",      id);
-            if (error[MOTOR_HALL_SENSOR ]) ROS_ERROR(" * servo id [%d] has MOTOR_HALL_SENSOR error",  id);
-            if (error[OVERHEATING       ]) ROS_ERROR(" * servo id [%d] has OVERHEATING error",        id);
-            if (error[MOTOR_ENCODER     ]) ROS_ERROR(" * servo id [%d] has MOTOR_ENCODER error",      id);
-            if (error[ELECTRONICAL_SHOCK]) ROS_ERROR(" * servo id [%d] has ELECTRONICAL_SHOCK error", id);
-            if (error[OVERLOAD          ]) ROS_ERROR(" * servo id [%d] has OVERLOAD error",           id);
-        }
-    }
-    return true;
 }
 
 /**
@@ -189,11 +151,74 @@ bool DynamixelHandler::SyncReadStateValues(const set<StateValues>& list_read_sta
     return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
-void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::DynamixelCommandFree& msg) {
-    if (msg.command == "reboot") { 
-        for (auto id : msg.id_list) ClearHardwareError(id);
-        if (msg.id_list.size() == 0) for (auto id : id_list_) ClearHardwareError(id);
+/**
+ * @func SyncReadHardwareError
+ * @brief ハードウェアエラーを読み込む
+ * @return 読み込みに成功したかどうか
+*/
+bool DynamixelHandler::SyncReadHardwareError(){
+    
+    auto id_error_map = dyn_comm_.SyncRead(hardware_error_status, id_list_);
+    if (dyn_comm_.timeout_last_read()   ) return false; // 読み込み失敗
+    if (dyn_comm_.comm_error_last_read()) return false; // 読み込み失敗
+
+    //  hardware_error_に反映
+    for ( auto pair : id_error_map ){
+        const uint8_t id = pair.first;
+        const uint8_t error = pair.second;
+        if ((error >> HARDWARE_ERROR_INPUT_VOLTAGE)     & 0b1 ) hardware_error_[id][INPUT_VOLTAGE     ] = true;
+        if ((error >> HARDWARE_ERROR_MOTOR_HALL_SENSOR) & 0b1 ) hardware_error_[id][MOTOR_HALL_SENSOR ] = true;
+        if ((error >> HARDWARE_ERROR_OVERHEATING)       & 0b1 ) hardware_error_[id][OVERHEATING       ] = true;
+        if ((error >> HARDWARE_ERROR_MOTOR_ENCODER)     & 0b1 ) hardware_error_[id][MOTOR_ENCODER     ] = true;
+        if ((error >> HARDWARE_ERROR_ELECTRONICAL_SHOCK)& 0b1 ) hardware_error_[id][ELECTRONICAL_SHOCK] = true;
+        if ((error >> HARDWARE_ERROR_OVERLOAD)          & 0b1 ) hardware_error_[id][OVERLOAD          ] = true;
     }
+
+    // コンソールへの表示
+    if ( varbose_read_hwerr_ ) {
+        ROS_WARN("SyncReadHardwareError: Hardware error are Checked");
+        for (auto pair : hardware_error_) {
+            uint8_t id = pair.first;
+            auto error = pair.second;
+            if (error[INPUT_VOLTAGE     ]) ROS_ERROR(" * servo id [%d] has INPUT_VOLTAGE error",      id);
+            if (error[MOTOR_HALL_SENSOR ]) ROS_ERROR(" * servo id [%d] has MOTOR_HALL_SENSOR error",  id);
+            if (error[OVERHEATING       ]) ROS_ERROR(" * servo id [%d] has OVERHEATING error",        id);
+            if (error[MOTOR_ENCODER     ]) ROS_ERROR(" * servo id [%d] has MOTOR_ENCODER error",      id);
+            if (error[ELECTRONICAL_SHOCK]) ROS_ERROR(" * servo id [%d] has ELECTRONICAL_SHOCK error", id);
+            if (error[OVERLOAD          ]) ROS_ERROR(" * servo id [%d] has OVERLOAD error",           id);
+        }
+    }
+    return true;
+}
+
+bool DynamixelHandler::SyncReadConfigParameter_Mode(){
+    return false;
+}
+
+bool DynamixelHandler::SyncReadConfigParameter_Gain(){
+    return false;
+}
+
+bool DynamixelHandler::SyncReadConfigParameter_Limit(){
+    return false;
+}
+
+
+void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::DynamixelCommandFree& msg) {
+    auto id_list = msg.id_list; 
+    if (id_list.empty()) for (auto id : id_list_) id_list.push_back(id);
+    if (msg.command == "clear")
+        for (auto id : id_list) ClearHardwareError(id);
+    if (msg.command == "enable") 
+        for (auto id : id_list) TorqueEnable(id);
+    if (msg.command == "disable")
+        for (auto id : id_list) TorqueDisable(id);
+    if (msg.command == "reboot") 
+        for (auto id : id_list) dyn_comm_.Reboot(id);
+}
+
+void DynamixelHandler::CallBackDxlCommand_Option(const dynamixel_handler::DynamixelCommand_Option& msg) {
+
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
@@ -280,11 +305,15 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
     if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
+void DynamixelHandler::BroadcastDxlStateFree(){
+
+}
+
 void DynamixelHandler::BroadcastDxlState(){
     dynamixel_handler::DynamixelState msg;
+    msg.stamp = ros::Time::now();
     for (auto id : id_list_) {
         msg.id_list.push_back(id);
-        msg.stamp = ros::Time::now();
         for (auto state : list_read_state_) switch(state) {
             case PRESENT_CURRENT:      msg.current__mA.push_back          (state_values_[id][PRESENT_CURRENT      ]    ); break;
             case PRESENT_VELOCITY:     msg.velocity__deg_s.push_back      (state_values_[id][PRESENT_VELOCITY     ]/DEG); break;
@@ -296,4 +325,28 @@ void DynamixelHandler::BroadcastDxlState(){
         }
     }
     pub_state_.publish(msg);
+}
+
+void DynamixelHandler::BroadcastDxlError(){
+    dynamixel_handler::DynamixelError msg;
+    msg.stamp = ros::Time::now();
+    for (auto id : id_list_) {
+        if (hardware_error_[id][INPUT_VOLTAGE     ]) msg.input_voltage.push_back     (id);
+        if (hardware_error_[id][MOTOR_HALL_SENSOR ]) msg.motor_hall_sensor.push_back (id);
+        if (hardware_error_[id][OVERHEATING       ]) msg.overheating.push_back       (id);
+        if (hardware_error_[id][MOTOR_ENCODER     ]) msg.motor_encoder.push_back     (id);
+        if (hardware_error_[id][ELECTRONICAL_SHOCK]) msg.electronical_shock.push_back(id);
+        if (hardware_error_[id][OVERLOAD          ]) msg.overload.push_back          (id);
+    }
+    pub_error_.publish(msg);
+}
+
+void DynamixelHandler::BroadcastDxlConfig_Limit(){
+
+}
+void DynamixelHandler::BroadcastDxlConfig_Gain(){
+
+}
+void DynamixelHandler::BroadcastDxlConfig_Mode(){
+
 }

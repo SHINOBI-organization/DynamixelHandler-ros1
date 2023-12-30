@@ -162,8 +162,9 @@ class DynamixelHandler {
         static bool SyncReadStateValues(StateValues target);
         static bool SyncReadStateValues(const set<StateValues>& list_read_state=list_read_state_);
         static bool SyncReadHardwareError();
-
-
+        static bool SyncReadConfigParameter_Mode();
+        static bool SyncReadConfigParameter_Gain();
+        static bool SyncReadConfigParameter_Limit();
 };
 
 namespace dyn_x{
