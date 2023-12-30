@@ -93,7 +93,7 @@ bool DynamixelHandler::Initialize(){
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;
     if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
-    if (!nh_p.getParam("init_torque_auto_enable",       do_torque_on  )) do_torque_on= true;
+    if (!nh_p.getParam("init_torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION, TORQUE_DISABLE);
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
@@ -142,7 +142,7 @@ void DynamixelHandler::MainLoop(){
         rtime = 0.0; wtime = 0.0; suc_read_part=0.0; suc_read_full=0.0, num_st_read=0.001;
     }
         
-    /*　処理時間時間の計測 */ auto rstart = system_clock::now();
+/*　処理時間時間の計測 */ auto rstart = system_clock::now();
 
     // //* Dynamixelから状態Read & topicをPublish
     static bool is_st_suc = false;
@@ -173,12 +173,12 @@ void DynamixelHandler::MainLoop(){
         if (is_gain_suc) BroadcastDxlConfig_Gain();
     }
 
-    /*　処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
+/*　処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();
 
-    /*　処理時間時間の計測 */ auto wstart = system_clock::now();
+/*　処理時間時間の計測 */ auto wstart = system_clock::now();
 
     if ( !use_slipt_write_ ) 
         SyncWriteCmdValues(list_wirte_cmd_);
@@ -187,7 +187,7 @@ void DynamixelHandler::MainLoop(){
     is_cmd_updated_.clear();
     list_wirte_cmd_.clear();
 
-    /*　処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
+/*　処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 }
 
 void DynamixelHandler::Terminate(int sig){

@@ -1,6 +1,28 @@
 <launch>
 
   <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
+        <!-- トピックの設定 -->
+        <!-- ユーザー定義 -->
+        <remap from="/dynamixel/cmd_free" to="/dynamixel/cmd_free"/>
+        <remap from="/dynamixel/state_free" to="/dynamixel/state_free"/>
+        <!-- 書き込みのみ -->
+        <remap from="/dynamixel/cmd/option" to="/dynamixel/cmd/option"/>
+        <remap from="/dynamixel/cmd/x/position" to="/dynamixel/cmd/position"/>
+        <remap from="/dynamixel/cmd/x/velocity" to="/dynamixel/cmd/velocity"/>
+        <remap from="/dynamixel/cmd/x/current" to="/dynamixel/cmd/current"/>
+        <remap from="/dynamixel/cmd/x/current_position" to="/dynamixel/cmd/current_position"/>
+        <remap from="/dynamixel/cmd/x/extended_position" to="/dynamixel/cmd/extended_position"/>
+        <!-- 読み込みのみ -->
+        <remap from="/dynamixel/state" to="/dynamixel/state"/>
+        <remap from="/dynamixel/error" to="/dynamixel/error"/>
+        <!-- 読み書き両方 -->
+        <remap from="/dynamixel/config/limit/r" to="/dynamixel/now_limit"/>
+        <remap from="/dynamixel/config/gain/r" to="/dynamixel/now_gain"/>
+        <remap from="/dynamixel/config/mode/r" to="/dynamixel/now_mode"/>
+        <remap from="/dynamixel/config/limit/w" to="/dynamixel/target_limit"/>
+        <remap from="/dynamixel/config/gain/w" to="/dynamixel/target_gain"/>
+        <remap from="/dynamixel/config/mode/w" to="/dynamixel/target_mode"/>
+
         <!-- 通信の設定 -->
         <param name="DEVICE_NAME" value="/dev/ttyUSB0"/>
         <param name="BAUDRATE" value="1000000"/>
@@ -9,28 +31,29 @@
         <param name="dyn_comm_varbose"        value="false"/>
 
         <!-- サーボの初期設定 -->
-        <param name="init_expected_servo_num"        value="12"/>
-        <param name="init_auto_search_max_id"        value="35"/>
-        <param name="init_hardware_error_auto_clean" value="true"/>
+        <param name="init_auto_search_max_id"        value="45"/>   <!-- 初期化時に行うサーボ自動検索の最大ID -->
+        <param name="init_expected_servo_num"        value="0"/>    <!-- 初期化時に自動検索するサーボの期待個数，　0ならいくつでもok -->
+        <param name="init_hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
+        <param name="init_torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動で有効にするかどうか -->
 
         <!-- ループの設定 -->
-        <param name="loop_rate" value="150"/>
-        <param name="ratio_state_read"  value="1"/>    <!-- この回数に一回 State を読み取る -->
+        <param name="loop_rate" value="250"/>
+        <param name="ratio_state_read"  value="2"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
         <param name="ratio_config_read" value="0"/>    <!-- この回数に一回 Config を読み取る, 0=初回のみ -->
-        <param name="ratio_error_read"  value="1000"/> <!-- この回数に一回 Hardware error を読み取る -->
+        <param name="ratio_error_read"  value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
         
         <!-- Read方式 -->
-        <param name="use_fast_read"  value="true"/>
-        <param name="use_slipt_read" value="false"/>
-        <param name="use_slipt_write" value="false"/>
+        <param name="use_fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
+        <param name="use_slipt_read" value="false"/> <!-- 複数のアドレスからの読み込みを分割するか同時に行うか, trueだと遅い -->
+        <param name="use_slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでも速度的に変わらない -->
         
         <!-- デバック用 -->
-        <param name="varbose_callback"    value="false"/>
         <param name="varbose_mainloop"    value="100"/>
+        <param name="varbose_callback"    value="false"/>
         <param name="varbose_write_cmd"   value="false"/>
         <param name="varbose_write_cfg"   value="false"/>
         <param name="varbose_read_st"     value="false"/>
-        <param name="varbose_read_st_err" value="true"/>
+        <param name="varbose_read_st_err" value="false"/>
         <param name="varbose_read_hwerr"  value="true"/>
         <param name="varbose_read_cfg"    value="false"/>
   </node>
