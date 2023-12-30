@@ -5,6 +5,11 @@ Robotis社の[Dynamixel](https://e-shop.robotis.co.jp/list.php?c_id=89)をROSか
 Dynamixelとやり取りを行うライブラリは[別のリポジトリ](https://github.com/SHINOBI-organization/lib_dynamixel)として管理しており，git submoduleの機能を使って取り込んでいる．
 
 note: ROS1のみ対応
+note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど予定している）
+
+## features of this package
+ - Dynamixelを繋いでnodeを起動するだけで，連結したDynamixelを自動認識．
+ - 
 
 ## how to install
 
@@ -18,9 +23,103 @@ $ git submodule update
 
 ## how to use
 
+### 1. Dynamixelを接続
+   DynaimixelをデイジーチェーンにしてUSBで接続する．
+
+   note: baudrateがすべて同一かつ，idに重複がないように事前に設定すること
+   
+### 2. dynamixel_handlerの起動
+
+baudrate: 1000000 かつ device name: /dec/ttyUSB0の場合
+
+#### rosrun からの起動
+argを指定してroscore, rosrunで実行
+
+ターミナルを開いて以下を実行
+```
+$ roscore
+```
+別のターミナルを開いて以下を実行
+```
+$ rosrun dynamixel_handler dynamixel_handler_node _BAUDRATE:=1000000 DEVICE:=/dev/ttyUSB0
 ```
 
+
+#### roslaunch からの起動
+dynamixel_handler.launchのargにbaudrateとdevice_nameを設定し，roslaunchで起動する
+
+dynamixel_handler.launchの以下の部分を編集し，保存
+```xml
+<arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
+<arg name="BAUDRATE" default="1000000"/>
 ```
+ターミナルを開いて以下を実行
+```
+$ roslaunch dynamixel_handler dynamixel_handler.launch
+```
+
+### 3. TopicのSub/Pub
+位置制御モード(position control mode)で角度を90degにしたい場合
+
+角度の制御
+```
+$ rostopic pub /dynamixel/cmd/x/position dynamixel_handler/DynamixelCommand_X_ControlPosition "{id_list: [5], position__deg: [90]}" -1
+```
+
+"read_present_current", "read_present_velocity", "read_present_position" をtrueに設定した場合
+
+状態の確認
+```
+$ rostopic echo /dyanmixel/state
+
+# 出力例
+---
+stamp: 
+  secs: 1703962959
+  nsecs: 388530440
+id_list: [5, 6]
+current__mA: [0.0, -2.69]
+velocity__deg_s: [0.0, 0.0]
+position__deg: [89.91210937499999, -0.2636718750000023]
+vel_trajectory__deg_s: []
+pos_trajectory__deg: []
+temperature__degC: []
+input_voltage__V: []
+---
+stamp:
+  secs: 1703962959
+  nsecs: 396484578
+id_list: [5, 6]
+current__mA: [0.0, -2.69]
+velocity__deg_s: [0.0, 0.0]
+position__deg: [89.91210937499999, -0.2636718750000023]
+vel_trajectory__deg_s: []
+pos_trajectory__deg: []
+temperature__degC: []
+input_voltage__V: []
+```
+
+
+## topic
+#### Subscribed by dyanmixel_handler　
+ - /dynamixel/cmd_free
+ - /dynamixel/cmd/x/current
+ - /dynamixel/cmd/x/velocity
+ - /dynamixel/cmd/x/position
+ - /dynamixel/cmd/x/extended_position
+ - /dynamixel/cmd/x/current_position 
+ - /dynamixel/cmd/option
+ - /dynamixel/config/gain/w
+ - /dynamixel/config/limit/w
+ - /dynamixel/config/mode/w
+ 
+#### Published from dyanmixel_handler　
+ - /dynamixel/state_free
+ - /dynamixel/state
+ - /dynamixel/error
+ - /dynamixel/config/gain/r
+ - /dynamixel/config/limit/r
+ - /dynamixel/config/mode/r
 
 ## 初期設定と注意事項
 
@@ -63,33 +162,33 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 
 ### 温度
  - temperature_limit  : 未実装，launchから設定できるようにしたいけど．．．
- - present_temperture : 未実装，rostopicとしてpubされるようにしたい
+ - present_temperture : rostopicとしてpubされるようにしたい
 
 ### 電圧
  - max_voltage_limit     : 未実装，launchから設定できるようにしたいけど．．．
  - min_voltage_limit     : 未実装，launchから設定できるようにしたいけど．．．
- - present_input_voltage : 未実装，rostopicとしてpubされるようにしたい
+ - present_input_voltage : rostopicとしてpubされるようにしたい
 
 ### PWM
  - pwm_limit   : 未実装，launchから設定できるようにしたいけど．．．
  - goal_pwm    : 未実装，特定の型のトピックのcallbackで設定されるようにしたい 
- - present_pwm : 未実装，rostopicとしてpubされるようにしたい        
+ - present_pwm : rostopicとしてpubされるようにしたい        
 
 ### 電流
  - current_limit   : 未実装，launchから設定できるようにしたいけど．．．
- - goal_current    : 未実装，特定の型のトピックのcallbackで設定されるようにしたい 
- - present_current : 未実装，rostopicとしてpubされるようにしたい
+ - goal_current    : 特定の型のトピックのcallbackで設定されるようにしたい 
+ - present_current : rostopicとしてpubされるようにしたい
 
 ### 加速度
  - acceleration_limit   : 未実装，launchから設定できるようにしたいけど．．．
- - profile_acceleration : 未実装， goal position/velocity書き込み時にオプションとしてつけたい
+ - profile_acceleration : 未実装，goal position/velocity書き込み時にオプションとしてつけたい
 
 ### 速度
  - velocity_limit      : 未実装，launchから設定できるようにしたいけど．．．
- - goal_velocity       : 未実装，特定の型のトピックのcallbackで設定されるようにしたい 
- - present_velocity    : 未実装，rostopicとしてpubされるようにしたい
+ - goal_velocity       : 特定の型のトピックのcallbackで設定されるようにしたい 
+ - present_velocity    : rostopicとしてpubされるようにしたい
  - profile_velocity    : 未実装， goal position書き込み時にオプションとしてつけたい
- - velocity_trajectory : not support
+ - velocity_trajectory : 
 
 ### 位置
  - max_position_limit    : 未実装，launchから設定できるようにしたいけど．．．これはかなり必要
@@ -112,9 +211,9 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
  - external_port_mode_{x} : 未実装，topicから制御できるようにする 
  - external_port_data_{x} : 未実装，topicから制御できるようにする 
 
-### 機能
+### 機能系
  - operating_mode         : 未実装，subしたtopicの型に合わせて自動で変わるようにする．
- - drive_mode             : not support 常に000000000を前提としたい．
+ - drive_mode             : 未実装，pubする
  - homing_offset          : ユーザーは使用不可，reboot時の角度補正に用いる
  - hardware_error_status  : error_ratioの割合でエラーのチェックを回す. 
                             todo error 検出はstatus packetに任せて詳細のpubに用いる
