@@ -25,6 +25,8 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 }
 
 bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after_state){
+    if ( dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000 ) return true; // エラーがない場合は何もしない
+
     auto now_pos_pulse = dyn_comm_.tryRead(present_position, id);
     auto now_pos_rad   = present_position.pulse2val(now_pos_pulse, model_[id]);
     int now_rot = (now_pos_rad+M_PI) / (2*M_PI);
@@ -38,7 +40,7 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
 
     after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
 
-    if (dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000) {
+    if ( dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000 ) {
         ROS_INFO("Servo id [%d] is cleared error", id);
         return true;
     } else {
@@ -61,10 +63,6 @@ bool DynamixelHandler::TorqueEnable(uint8_t id){
 bool DynamixelHandler::TorqueDisable(uint8_t id){
     dyn_comm_.tryWrite(torque_enable, id, TORQUE_DISABLE);
     return dyn_comm_.tryRead(torque_enable, id) == TORQUE_DISABLE;
-}
-
-bool DynamixelHandler::CheckHardwareError(uint8_t id){
-    return dyn_comm_.tryRead(hardware_error_status, id); //todo dyn_comm_にエラー簡易的なHWエラー判定を実装する
 }
 
 bool DynamixelHandler::SyncReadHardwareError(){

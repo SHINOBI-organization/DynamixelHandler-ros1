@@ -38,87 +38,6 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("dyn_comm_inerval_msec",  msec_interval)) msec_interval = 10;
     dyn_comm_.set_retry_config(num_try, msec_interval);
 
-    // ROS_INFO("=======================");
-    
-    // int64_t tmp3= dyn_comm_.Read(profile_acceleration, 32);
-    // ROS_INFO("%d", (int)tmp3);
-    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
-    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
-    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
-
-    // vector<int64_t> tmp2= dyn_comm_.Read({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, 32);
-    // for (auto val : tmp2) ROS_INFO("  %d", (int)val);
-    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
-    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
-    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
-
-
-    // auto tmp4 = dyn_comm_.SyncRead_fast(profile_acceleration, {32, 33});
-    // for (auto pair : tmp4) {
-    //     ROS_INFO("id: %d", (int)pair.first);
-    //     ROS_INFO(" - %d", (int)pair.second);
-    // }
-    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
-    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
-    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
-
-
-    // auto tmp = dyn_comm_.SyncRead_fast({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, {32, 33});
-    // for (auto pair : tmp) {
-    //     ROS_INFO("id: %d", (int)pair.first);
-    //     for (auto val : pair.second) {
-    //         ROS_INFO(" - %d", (int)val);
-    //     }
-    // }
-    // ROS_WARN("hardware error last %d", dyn_comm_.hardware_error_last_read());
-    // ROS_WARN("comm error last %d", dyn_comm_.comm_error_last_read());
-    // ROS_WARN("timeout last %d", dyn_comm_.timeout_last_read());
-
-
-    // ROS_INFO("=======================");
-
-    // dyn_comm_.Write(profile_acceleration, 32, 100);
-    // int64_t tmp31= dyn_comm_.Read(profile_acceleration, 32);
-    // ROS_INFO("%d", (int)tmp31);
-
-    // dyn_comm_.Write({goal_velocity, profile_acceleration, profile_velocity, goal_position}, 32, {10, 20, 30, 40});
-    // vector<int64_t> tmp21= dyn_comm_.Read({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, 32);
-    // for (auto val : tmp21) ROS_INFO("  %d", (int)val);
-
-    // dyn_comm_.SyncWrite(profile_acceleration, {32, 33}, {100, 200});
-    // auto tmp41 = dyn_comm_.SyncRead(profile_acceleration, {32, 33});
-    // for (auto pair : tmp41) {
-    //     ROS_INFO("id: %d", (int)pair.first);
-    //     ROS_INFO(" - %d", (int)pair.second);
-    // }
-
-    // dyn_comm_.SyncWrite({goal_velocity ,profile_acceleration, profile_velocity, goal_position}, {{32, {11, 21, 31, 41}}, {33, {12, 22, 32, 32}}});
-    // auto tmp11 = dyn_comm_.SyncRead({profile_acceleration, profile_velocity, goal_velocity ,goal_position}, {32, 33});
-    // for (auto pair : tmp11) {
-    //     ROS_INFO("id: %d", (int)pair.first);
-    //     for (auto val : pair.second) {
-    //         ROS_INFO(" - %d", (int)val);
-    //     }
-    // }
-    
-    // ROS_INFO("=======================");
-
-    // id_listの作成
-    int num_expexted, id_max; bool do_clean_hwerr;
-    if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
-    if (!nh_p.getParam("init_expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
-    if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
-    ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
-    auto num_found = ScanDynamixels(id_max);
-    if( num_found==0 ) {
-        ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
-        return false;
-    }
-    if( num_expexted>0 && num_expexted!=num_found ) {
-        ROS_ERROR("Number of Dynamixel is not matched. Expected [%d], but found [%d]", num_expexted, num_found);
-        return false;
-    }
-
     // main loop の設定
     if (!nh_p.getParam("loop_rate",        loop_rate_ )) loop_rate_ =  50;
     if (!nh_p.getParam("ratio_state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
@@ -137,9 +56,32 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("varbose_mainloop", varbose_mainloop_ )) varbose_mainloop_  =  false;
     bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
 
+    // id_listの作成
+    int num_expexted, id_max; bool do_clean_hwerr;
+    if (!nh_p.getParam("init_expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
+    if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
+    ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
+    auto num_found = ScanDynamixels(id_max);
+    if( num_found==0 ) {
+        ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
+        return false;
+    }
+    if( num_expexted>0 && num_expexted!=num_found ) {
+        ROS_ERROR("Number of Dynamixel is not matched. Expected [%d], but found [%d]", num_expexted, num_found);
+        return false;
+    }
 
-    //  readする情報の設定
-    // todo rosparamで設定できるようにする
+    // サーボの初期化
+    if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
+    for (auto id : id_list_) if (series_[id] == SERIES_X) {
+        if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
+        if ( !TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
+        if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
+        if ( !dyn_comm_.tryWrite(profile_acceleration, id, 500)) ROS_WARN("Servo id [%d] failed to set profile_acceleration", id);
+        if ( !dyn_comm_.tryWrite(profile_velocity, id, 100)) ROS_WARN("Servo id [%d] failed to set profile_velocity", id);
+        if ( !dyn_comm_.tryWrite(homing_offset, id, 0)) ROS_WARN("Servo id [%d] failed to set homing_offset", id);
+        if ( !TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
+    }
 
     // cmd_values_の内部の情報の初期化
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
@@ -151,16 +93,17 @@ bool DynamixelHandler::Initialize(){
         cmd_values_[id][GOAL_POSITION]        = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);    // エラー時は0
     }
 
-    // サーボの実体としてのDynamixel Chainの初期化, 今回は一旦すべて電流制御付き位置制御モードにしてトルクON    
-    for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        if ( do_clean_hwerr && CheckHardwareError(id) ) ClearHardwareError(id, TORQUE_DISABLE); // ここでは雑に判定している．本来の返り値はuint8_tで各ビットに意味がある. 
-        if ( !TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
-        if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
-        if ( !dyn_comm_.tryWrite(profile_acceleration, id, 500)) ROS_WARN("Servo id [%d] failed to set profile_acceleration", id);
-        if ( !dyn_comm_.tryWrite(profile_velocity, id, 100)) ROS_WARN("Servo id [%d] failed to set profile_velocity", id);
-        if ( !dyn_comm_.tryWrite(homing_offset, id, 0)) ROS_WARN("Servo id [%d] failed to set homing_offset", id);
-        if ( !TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
-    }
+    //  readする情報の設定
+    list_read_state_ = {
+        PRESENT_PWM          ,
+        PRESENT_CURRENT      ,
+        PRESENT_VELOCITY     ,
+        PRESENT_POSITION     ,
+        VELOCITY_TRAJECTORY  ,
+        POSITION_TRAJECTORY  ,
+        PRESENT_INPUT_VOLTAGE,
+        PRESENT_TEMPERTURE   ,
+    };
 
     return true;
 }
