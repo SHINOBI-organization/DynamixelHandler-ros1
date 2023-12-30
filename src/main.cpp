@@ -115,7 +115,6 @@ bool DynamixelHandler::Initialize(){
     int num_expexted, id_max; 
     if (!nh_p.getParam("init_expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
     if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
-    ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
     auto num_found = ScanDynamixels(id_max);
     if( num_found==0 ) { // 見つからなかった場合は初期化失敗で終了
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
@@ -132,7 +131,7 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("init_torque_auto_enable",       do_torque_on  )) do_torque_on= true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
-        // ChangeOperatingMode(id, OPAERATING_MODE_POSITION);        
+        ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION, TORQUE_DISABLE);
         if ( do_torque_on ) TorqueEnable(id);
     }
 

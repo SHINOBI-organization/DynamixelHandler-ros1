@@ -5,24 +5,28 @@ using namespace dyn_x;
 //* 基本機能をまとめた関数たち
 
 // 各シリーズのDynamixelを検出する．
-uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {   
+uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
+    ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
     id_list_.clear();
-
     for (int id = 0; id <= id_max; id++) {
         if ( !dyn_comm_.tryPing(id) ) continue;
-        int dyn_model = dyn_comm_.tryRead(model_number, id);
+        auto op_mode = dyn_comm_.tryRead(operating_mode, id);
+        auto dyn_model = dyn_comm_.tryRead(model_number, id);
         switch ( dynamixel_series(dyn_model) ) { 
             case SERIES_X: ROS_INFO(" * X series servo id [%d] is found", id);
                 model_[id] = dyn_model;
                 series_[id] = SERIES_X;
+                op_mode_[id] = op_mode;
                 id_list_.push_back(id); break;
             case SERIES_P: ROS_INFO(" * P series servo id [%d] is found", id);
                 model_[id] = dyn_model;
                 series_[id] = SERIES_P;
+                op_mode_[id] = op_mode;
                 id_list_.push_back(id); break;
-            default: ROS_WARN(" * Unkwon model [%d] servo id [%d] is found", dyn_model, id);
+            default: ROS_WARN(" * Unkwon model [%d] servo id [%d] is found", (int)dyn_model, id);
         }
     }
+    ROS_INFO("Finish scanning Dynamixel");
     return id_list_.size();
 }
 
@@ -47,7 +51,7 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
 }
 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
-    // 角度の同期
+    // 角度を同期する
     auto now_pos = ReadPresentPosition(id);
     cmd_values_[id][GOAL_POSITION]      = now_pos;
     state_values_[id][PRESENT_POSITION] = now_pos;
@@ -64,6 +68,27 @@ bool DynamixelHandler::TorqueDisable(uint8_t id){
     bool is_disable = dyn_comm_.tryRead(torque_enable, id) == TORQUE_DISABLE;
     if ( !is_disable ) ROS_ERROR("Servo id [%d] failed to disable torque", id);
     return is_disable;
+}
+
+bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after_state){
+    if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
+    if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
+
+    TorqueDisable(id); // 変更のためにトルクオフ
+
+    dyn_comm_.tryWrite(operating_mode, id, mode);
+
+    after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
+
+    bool is_changed = dyn_comm_.tryRead(operating_mode, id) == mode;
+    if ( is_changed ) {
+        op_mode_[id] = mode;
+        when_op_mode_updated_[id] = Time::now();
+        ROS_INFO("Servo id [%d] is changed operating mode [%d]", id, mode);
+    } else {
+        ROS_ERROR("Servo id [%d] failed to change operating mode", id); 
+    }
+    return is_changed;
 }
 
 //* 基本機能たち
@@ -91,6 +116,8 @@ bool DynamixelHandler::WriteHomingOffset(uint8_t id, double offset){
     auto offset_pulse = homing_offset.val2pulse(offset, model_[id]);
     return dyn_comm_.tryWrite(homing_offset, id, offset_pulse);
 }
+
+//* Main loop 内で使う全モータへの一括読み書き関数たち
 
 /**
  * @func SyncWriteCmdValues
@@ -234,6 +261,7 @@ bool DynamixelHandler::SyncReadConfigParameter_Limit(){
     return false;
 }
 
+//* ROS関係
 
 void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::DynamixelCommandFree& msg) {
     auto id_list = msg.id_list; 
@@ -262,6 +290,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
         cmd_values_[id][GOAL_POSITION] = deg2rad(pos);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
+        ChangeOperatingMode(id, OPERATING_MODE_POSITION);
     }
     if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
@@ -276,6 +305,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::Dy
         cmd_values_[id][GOAL_VELOCITY] = deg2rad(vel);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_VELOCITY);
+        ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
     }
     if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_velocity are updated", (int)msg.id_list.size());
 }
@@ -290,6 +320,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::Dyn
         cmd_values_[id][GOAL_CURRENT] = cur;
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
+        ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
     }
     if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_current are updated", (int)msg.id_list.size());
 }
@@ -315,6 +346,7 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
             cmd_values_[id][GOAL_CURRENT] = cur;
             list_wirte_cmd_.insert(GOAL_CURRENT);
         }
+        ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
     }
     if (varbose_callback_ && do_process_cur) ROS_INFO(" -  %d servo(s) goal_current are updated", (int)msg.id_list.size());
     if (varbose_callback_ && do_process_pos) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
@@ -332,6 +364,7 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
         is_cmd_updated_[id] = true;
         cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
         list_wirte_cmd_.insert(GOAL_POSITION);
+        ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
     }
     if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }

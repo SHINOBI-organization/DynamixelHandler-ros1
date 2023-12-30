@@ -2,6 +2,7 @@
 #define DYNAMIXEL_HANDLER_H_
 
 #include <ros/ros.h>
+using ros::Time;
 #include <std_msgs/String.h>
 
 #include "dynamixel_communicator.h"
@@ -92,7 +93,7 @@ class DynamixelHandler {
         //* Dynamixelとの通信を超えた機能
         static uint8_t ScanDynamixels(uint8_t id_max);
         static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
-        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode);
+        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode, DynamixelTorquePermission after_state=TORQUE_ENABLE);
         static bool TorqueEnable(uint8_t servo_id);
         static bool TorqueDisable(uint8_t servo_id);
     //* Dynamixel単体との通信の組み合わせ
@@ -152,12 +153,14 @@ class DynamixelHandler {
         static inline vector<uint8_t> id_list_; // chained dynamixel id list
         static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
         static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
+        static inline map<uint8_t, uint8_t> op_mode_; // 各dynamixelの id と 動作モード のマップ
         // 連結しているサーボの個々の状態を保持するmap
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValuesに対応する
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStateValuesに対応する
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHardwareErrorsに対応する
         // 上記の変数を適切に使うための補助的なフラグ
-        static inline map<uint8_t, bool> is_cmd_updated_; // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
+        static inline map<uint8_t, Time> when_op_mode_updated_; // 
+        static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
         static inline bool has_any_hardware_error_    = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
         static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
         static inline bool is_timeout_read_state_    = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
