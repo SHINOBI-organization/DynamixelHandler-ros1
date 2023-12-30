@@ -199,7 +199,8 @@ void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::Dynamixel
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
-    if ( msg.id_list.size() != msg.position__deg.size() ) return;
+    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Position"); // msg.id_listと同じサイズの奴だけ処理する
+    if ( msg.id_list.size() != msg.position__deg.size() ) { ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -208,11 +209,12 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Position");
+    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg) {
-    if ( msg.id_list.size() != msg.velocity__deg_s.size() ) return;
+    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Velocity"); // msg.id_listと同じサイズの奴だけ処理する
+    if ( msg.id_list.size() != msg.velocity__deg_s.size() ) { ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -221,11 +223,12 @@ void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::Dy
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_VELOCITY);
     }
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Velocity");
+    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_velocity are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg) {
-    if ( msg.id_list.size() != msg.current__mA.size() ) return;
+    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Current"); // msg.id_listと同じサイズの奴だけ処理する
+    if ( msg.id_list.size() != msg.current__mA.size() ) { ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -234,46 +237,49 @@ void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::Dyn
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
     }
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Current");
+    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_current are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_handler::DynamixelCommand_X_ControlCurrentPosition& msg) {
-    if ( !msg.current__mA.empty()   && msg.id_list.size() != msg.current__mA.size()  ) return; // 空なら無視するのでOK, 空でないならサイズ一致が必要
-    if ( !msg.position__deg.empty() && msg.id_list.size() != msg.position__deg.size()) return; // なので，空でなくかつサイズ不一致はスキップする
-    if ( !msg.rotation.empty()      && msg.id_list.size() != msg.rotation.size()     ) return;
+    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_CurrentPosition"); // msg.id_listと同じサイズの奴だけ処理する
+    const bool do_process_cur = msg.id_list.size() == msg.current__mA.size();
+    const bool do_process_pos = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
+    if ( !do_process_cur && !do_process_pos ) { ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
-        if (!msg.position__deg.empty() || !msg.rotation.empty()){
-            auto pos = !msg.position__deg.empty() ? msg.position__deg[i] : cmd_values_[id][GOAL_POSITION]*DEG ;
-            auto rot = !msg.rotation.empty()      ? msg.rotation[i]      : 0;
+        if ( do_process_pos ){
+            auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
+            auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
             list_wirte_cmd_.insert(GOAL_POSITION);
         }
-        if (!msg.current__mA.empty()){
+        if ( do_process_cur ){
             auto cur = msg.current__mA[i];
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_CURRENT] = cur;
             list_wirte_cmd_.insert(GOAL_CURRENT);
         }
     }
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_CurrentPosition");
+    if (varbose_callback_ && do_process_cur) ROS_INFO(" -  %d servo(s) goal_current are updated", (int)msg.id_list.size());
+    if (varbose_callback_ && do_process_pos) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg) {
-    if ( !msg.position__deg.empty() && msg.id_list.size() != msg.position__deg.size()) return; // 空なら無視するのでOK, 空でないならサイズ一致が必要
-    if ( !msg.rotation.empty()     && msg.id_list.size() != msg.rotation.size()      ) return; // なので，空でなくかつサイズ不一致はスキップする
+    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_ExtendedPosition");
+    const bool do_process = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
+    if ( !do_process ) { ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
-        auto pos = !msg.position__deg.empty() ? msg.position__deg[i] : cmd_values_[id][GOAL_POSITION]*DEG ;
-        auto rot = !msg.rotation.empty()      ? msg.rotation[i]      : 0;
+        auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
+        auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
         is_cmd_updated_[id] = true;
         cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
         list_wirte_cmd_.insert(GOAL_POSITION);
     }
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_ExtendedPosition");
+    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::BroadcastDxlState(){

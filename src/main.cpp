@@ -216,9 +216,11 @@ void DynamixelHandler::MainLoop(){
 
     /*　処理時間時間の計測 */ auto wstart = system_clock::now();
 
-    if ( !use_slipt_write_ ) SyncWriteCmdValues(list_wirte_cmd_);
-    else for (auto each_cmd : list_wirte_cmd_) SyncWriteCmdValues(each_cmd); 
-    for (int id : id_list_) if ( series_[id]==SERIES_X ) is_cmd_updated_[id] = false;
+    if ( !use_slipt_write_ ) 
+        SyncWriteCmdValues(list_wirte_cmd_);
+    else for (auto each_cmd : list_wirte_cmd_) 
+        SyncWriteCmdValues(each_cmd); 
+    is_cmd_updated_.clear();
     list_wirte_cmd_.clear();
 
     /*　処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
