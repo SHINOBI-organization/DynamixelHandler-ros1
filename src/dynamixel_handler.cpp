@@ -124,11 +124,11 @@ bool DynamixelHandler::WriteHomingOffset(uint8_t id, double offset){
  * @brief 指定した範囲のコマンド値を書き込む
  * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
 */
-void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ set<CmdValues> t = {target} ; return SyncWriteCmdValues(t);} 
-void DynamixelHandler::SyncWriteCmdValues(const set<CmdValues>& list_wirte_cmd){
+void DynamixelHandler::SyncWriteCmdValues(CmdValueIndex target){ set<CmdValueIndex> t = {target} ; return SyncWriteCmdValues(t);} 
+void DynamixelHandler::SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_cmd){
     if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
-    const CmdValues start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
-    const CmdValues end   = *max_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
+    const CmdValueIndex start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
+    const CmdValueIndex end   = *max_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
     if ( !(0 <= start && start <= end && end < cmd_dp_list.size()) ) return;
 
     vector<DynamixelAddress> target_cmd_dp_list;   // 書き込むコマンドのアドレスのベクタを作成
@@ -160,11 +160,11 @@ void DynamixelHandler::SyncWriteCmdValues(const set<CmdValues>& list_wirte_cmd){
  * @param list_read_state 読み込む状態値のEnumのリスト
  * @return 読み込みに成功したかどうか
 */
-bool DynamixelHandler::SyncReadStateValues(StateValues target){ set<StateValues> t = {target} ; return SyncReadStateValues(t);}
-bool DynamixelHandler::SyncReadStateValues(const set<StateValues>& list_read_state){
+bool DynamixelHandler::SyncReadStateValues(StValueIndex target){ set<StValueIndex> t = {target} ; return SyncReadStateValues(t);}
+bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_state){
     if ( list_read_state.empty() ) return false; // 空なら何もしない
-    const StateValues start = *min_element(list_read_state.begin(), list_read_state.end());
-    const StateValues end   = *max_element(list_read_state.begin(), list_read_state.end());
+    const StValueIndex start = *min_element(list_read_state.begin(), list_read_state.end());
+    const StValueIndex end   = *max_element(list_read_state.begin(), list_read_state.end());
     if ( !(0 <= start && start <= end && end < state_dp_list.size()) ) return false;
 
     vector<DynamixelAddress> target_state_dp_list(

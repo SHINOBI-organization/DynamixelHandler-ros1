@@ -123,7 +123,7 @@ class DynamixelHandler {
         //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
         //* Dynamixelを扱うための変数群 
-        enum CmdValues { //　cmd_values_のIndex, サーボに毎周期で書き込むことができる値
+        enum CmdValueIndex { //　cmd_values_のIndex, サーボに毎周期で書き込むことができる値
             GOAL_PWM             = 0,
             GOAL_CURRENT         = 1,
             GOAL_VELOCITY        = 2,
@@ -131,7 +131,7 @@ class DynamixelHandler {
             PROFILE_VELOCITY     = 4,
             GOAL_POSITION        = 5,
         };
-        enum StateValues { // state_values_のIndex, サーボから毎周期で読み込むことができる値
+        enum StValueIndex { // state_values_のIndex, サーボから毎周期で読み込むことができる値
             PRESENT_PWM          = 0,
             PRESENT_CURRENT      = 1,
             PRESENT_VELOCITY     = 2,
@@ -141,13 +141,13 @@ class DynamixelHandler {
             PRESENT_INPUT_VOLTAGE= 6,
             PRESENT_TEMPERTURE   = 7,
         };
-        enum HardwareErrors { // hardware_error_のIndex, サーボが起こしたハードウェアエラー
-            INPUT_VOLTAGE      = 0, // HARDWARE_ERROR_INPUT_VOLTAGE     
-            MOTOR_HALL_SENSOR  = 1, // HARDWARE_ERROR_MOTOR_HALL_SENSOR 
-            OVERHEATING        = 2, // HARDWARE_ERROR_OVERHEATING       
-            MOTOR_ENCODER      = 3, // HARDWARE_ERROR_MOTOR_ENCODER     
-            ELECTRONICAL_SHOCK = 4, // HARDWARE_ERROR_ELECTRONICAL_SHOCK
-            OVERLOAD           = 5, // HARDWARE_ERROR_OVERLOAD          
+        enum HWErrIndex { // hardware_error_のIndex, サーボが起こしたハードウェアエラー
+            INPUT_VOLTAGE      = 0,
+            MOTOR_HALL_SENSOR  = 1,
+            OVERHEATING        = 2,
+            MOTOR_ENCODER      = 3,
+            ELECTRONICAL_SHOCK = 4,
+            OVERLOAD           = 5,
         };
         // 連結したサーボの基本情報
         static inline vector<uint8_t> id_list_; // chained dynamixel id list
@@ -155,23 +155,23 @@ class DynamixelHandler {
         static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
         static inline map<uint8_t, uint8_t> op_mode_; // 各dynamixelの id と 動作モード のマップ
         // 連結しているサーボの個々の状態を保持するmap
-        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValuesに対応する
-        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStateValuesに対応する
-        static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHardwareErrorsに対応する
+        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValueIndexに対応する
+        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStValueIndexに対応する
+        static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHWErrIndexに対応する
         // 上記の変数を適切に使うための補助的なフラグ
         static inline map<uint8_t, Time> when_op_mode_updated_; // 
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
         static inline bool has_any_hardware_error_    = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
         static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
-        static inline bool is_timeout_read_state_    = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
+        static inline bool is_timeout_read_state_     = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
         // 各周期で実行するserial通信の内容を決めるためのset
-        static inline set<CmdValues>   list_wirte_cmd_  = {};
-        static inline set<StateValues> list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
+        static inline set<CmdValueIndex>   list_wirte_cmd_  = {};
+        static inline set<StValueIndex> list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
-        static void SyncWriteCmdValues(CmdValues target);
-        static void SyncWriteCmdValues(const set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
-        static bool SyncReadStateValues(StateValues target);
-        static bool SyncReadStateValues(const set<StateValues>& list_read_state=list_read_state_);
+        static void SyncWriteCmdValues(CmdValueIndex target);
+        static void SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_cmd=list_wirte_cmd_);
+        static bool SyncReadStateValues(StValueIndex target);
+        static bool SyncReadStateValues(const set<StValueIndex>& list_read_state=list_read_state_);
         static bool SyncReadHardwareError();
         static bool SyncReadConfigParameter_Mode();
         static bool SyncReadConfigParameter_Gain();

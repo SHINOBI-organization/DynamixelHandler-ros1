@@ -186,7 +186,7 @@ void DynamixelHandler::MainLoop(){
         is_st_suc = false;
         if ( !use_slipt_read_ ) 
             is_st_suc  = SyncReadStateValues(list_read_state_);
-        else for (StateValues each_state : list_read_state_) 
+        else for (auto each_state : list_read_state_) 
             is_st_suc += SyncReadStateValues(each_state);
         num_st_read++;
         suc_read_part += is_st_suc;
