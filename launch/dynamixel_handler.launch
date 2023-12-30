@@ -1,31 +1,47 @@
 <launch>
 
-  <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
+    <!-- フォーマットに使える奴ら 
+    ${severity}  ERROR
+    ${message} hello world 0
+    ${time}  1284058208.824620563
+    ${thread}  0xcd63d0
+    ${logger}  ros.roscpp_tutorials
+    ${file}  /wg/bvu/jfaust/ros/stacks/ros_tutorials/roscpp_tutorials/talker/talker.cpp
+    ${line}  92
+    ${function}  main
+    ${node}  /talker 
+    -->
+    <env name="ROSCONSOLE_FORMAT" value="[${time}] ${function}: ${message}"/>
+    
+    <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
+    <arg name="BAUDRATE" default="1000000"/>
+
+    <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
         <!-- トピックの設定 -->
         <!-- ユーザー定義 -->
-        <remap from="/dynamixel/cmd_free" to="/dynamixel/cmd_free"/>
+        <remap from="/dynamixel/cmd_free"   to="/dynamixel/cmd_free"/>
         <remap from="/dynamixel/state_free" to="/dynamixel/state_free"/>
         <!-- 書き込みのみ -->
-        <remap from="/dynamixel/cmd/option" to="/dynamixel/cmd/option"/>
-        <remap from="/dynamixel/cmd/x/position" to="/dynamixel/cmd/position"/>
-        <remap from="/dynamixel/cmd/x/velocity" to="/dynamixel/cmd/velocity"/>
-        <remap from="/dynamixel/cmd/x/current" to="/dynamixel/cmd/current"/>
-        <remap from="/dynamixel/cmd/x/current_position" to="/dynamixel/cmd/current_position"/>
-        <remap from="/dynamixel/cmd/x/extended_position" to="/dynamixel/cmd/extended_position"/>
+        <remap from="/dynamixel/cmd/option"              to="/dynamixel/cmd/option"/>
+        <remap from="/dynamixel/cmd/x/position"          to="/dynamixel/cmd/x/position"/>
+        <remap from="/dynamixel/cmd/x/velocity"          to="/dynamixel/cmd/x/velocity"/>
+        <remap from="/dynamixel/cmd/x/current"           to="/dynamixel/cmd/x/current"/>
+        <remap from="/dynamixel/cmd/x/current_position"  to="/dynamixel/cmd/x/current_position"/>
+        <remap from="/dynamixel/cmd/x/extended_position" to="/dynamixel/cmd/x/extended_position"/>
         <!-- 読み込みのみ -->
         <remap from="/dynamixel/state" to="/dynamixel/state"/>
         <remap from="/dynamixel/error" to="/dynamixel/error"/>
         <!-- 読み書き両方 -->
-        <remap from="/dynamixel/config/limit/r" to="/dynamixel/now_limit"/>
-        <remap from="/dynamixel/config/gain/r" to="/dynamixel/now_gain"/>
-        <remap from="/dynamixel/config/mode/r" to="/dynamixel/now_mode"/>
-        <remap from="/dynamixel/config/limit/w" to="/dynamixel/target_limit"/>
-        <remap from="/dynamixel/config/gain/w" to="/dynamixel/target_gain"/>
-        <remap from="/dynamixel/config/mode/w" to="/dynamixel/target_mode"/>
+        <remap from="/dynamixel/config/limit/r" to="/dynamixel/config/limit/r"/>
+        <remap from="/dynamixel/config/gain/r"  to="/dynamixel/config/gain/r" />
+        <remap from="/dynamixel/config/mode/r"  to="/dynamixel/config/mode/r" />
+        <remap from="/dynamixel/config/limit/w" to="/dynamixel/config/limit/w"/>
+        <remap from="/dynamixel/config/gain/w"  to="/dynamixel/config/gain/w" />
+        <remap from="/dynamixel/config/mode/w"  to="/dynamixel/config/mode/w" />
 
         <!-- 通信の設定 -->
-        <param name="DEVICE_NAME" value="/dev/ttyUSB0"/>
-        <param name="BAUDRATE" value="1000000"/>
+        <param name="device_name" value="$(arg DEVICE_NAME)"/>
+        <param name="baudrate" value="$(arg BAUDRATE)"/>
         <param name="dyn_comm_retry_num"      value="3"/>
         <param name="dyn_comm_inerval_msec"   value="5"/>
         <param name="dyn_comm_varbose"        value="false"/>
@@ -56,6 +72,6 @@
         <param name="varbose_read_st_err" value="false"/>
         <param name="varbose_read_hwerr"  value="true"/>
         <param name="varbose_read_cfg"    value="false"/>
-  </node>
+    </node>
 
 </launch>

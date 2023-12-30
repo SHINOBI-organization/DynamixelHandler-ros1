@@ -31,10 +31,10 @@ bool DynamixelHandler::Initialize(){
     pub_config_mode_  = nh.advertise<dynamixel_handler::DynamixelConfig_Mode>("/dynamixel/config/mode/r", 10);
 
     // 通信の開始
-    int BAUDRATE; string DEVICE_NAME;
-    if (!nh_p.getParam("BAUDRATE",         BAUDRATE   ) ) BAUDRATE    =  1000000;
-    if (!nh_p.getParam("DEVICE_NAME",      DEVICE_NAME) ) DEVICE_NAME = "/dev/ttyUSB0";
-    dyn_comm_ = DynamixelComunicator(DEVICE_NAME.c_str(), BAUDRATE);
+    int baudrate; string device_name;
+    if (!nh_p.getParam("baudrate",         baudrate   ) ) baudrate    =  1000000;
+    if (!nh_p.getParam("device_name",      device_name) ) device_name = "/dev/ttyUSB0";
+    dyn_comm_ = DynamixelComunicator(device_name.c_str(), baudrate);
     if ( !dyn_comm_.OpenPort() ) {
         ROS_ERROR("Failed to open USB device [%s]", dyn_comm_.port_name().c_str()); 
         return false;
@@ -112,16 +112,24 @@ bool DynamixelHandler::Initialize(){
     }
 
     //  readする情報の設定
-    list_read_state_ = {
-        // PRESENT_PWM          ,
-        PRESENT_CURRENT      ,
-        PRESENT_VELOCITY     ,
-        PRESENT_POSITION     ,
-        VELOCITY_TRAJECTORY  ,
-        POSITION_TRAJECTORY  ,
-        // PRESENT_INPUT_VOLTAGE,
-        // PRESENT_TEMPERTURE   ,
-    };
+    bool read_pwm, read_cur, read_vel, read_pos, read_vel_traj, read_pos_traj, read_volt, read_temp;
+    if (!nh_p.getParam("read_present_pwm",         read_pwm))      read_pwm = false;
+    if (!nh_p.getParam("read_present_current",     read_cur))      read_cur = true;
+    if (!nh_p.getParam("read_present_velocity",    read_vel))      read_vel = true;
+    if (!nh_p.getParam("read_present_position",    read_pos))      read_pos = true;
+    if (!nh_p.getParam("read_velocity_trajectory", read_vel_traj)) read_vel_traj = false;
+    if (!nh_p.getParam("read_position_trajectory", read_pos_traj)) read_pos_traj = false;
+    if (!nh_p.getParam("read_input_voltage",       read_volt))     read_volt = false;
+    if (!nh_p.getParam("read_present_temperature", read_temp))     read_temp = false;
+    list_read_state_.clear();
+    if ( read_pwm ) list_read_state_.insert(PRESENT_PWM);
+    if ( read_cur ) list_read_state_.insert(PRESENT_CURRENT);
+    if ( read_vel ) list_read_state_.insert(PRESENT_VELOCITY);
+    if ( read_pos ) list_read_state_.insert(PRESENT_POSITION);
+    if ( read_vel_traj ) list_read_state_.insert(VELOCITY_TRAJECTORY);
+    if ( read_pos_traj ) list_read_state_.insert(POSITION_TRAJECTORY);
+    if ( read_volt ) list_read_state_.insert(PRESENT_INPUT_VOLTAGE);
+    if ( read_temp ) list_read_state_.insert(PRESENT_TEMPERTURE);
 
     return true;
 }
