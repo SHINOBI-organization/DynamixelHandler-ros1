@@ -108,11 +108,10 @@ bool DynamixelHandler::SyncReadHardwareError(){
  * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
 */
 void DynamixelHandler::SyncWriteCmdValues(CmdValues target){ set<CmdValues> t = {target} ; return SyncWriteCmdValues( t ); } 
-void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
+void DynamixelHandler::SyncWriteCmdValues(const set<CmdValues>& list_wirte_cmd){
     if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
     const CmdValues start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
     const CmdValues end   = *max_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
-    list_wirte_cmd.clear(); // 先にクリアすることで，誤ってstartと　endに変な値が混入した場合の影響が永続しないようにする．
     if ( !(0 <= start && start <= end && end < cmd_dp_list.size()) ) return;
 
     vector<DynamixelAddress> target_cmd_dp_list;   // 書き込むコマンドのアドレスのベクタを作成
@@ -126,7 +125,6 @@ void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
             id_data_vec_map[id].push_back( dp.val2pulse( cmd_values_[id][cmd], model_[id]) );
         }
     }
-    for (int id : id_list_) if ( series_[id]==SERIES_X ) is_cmd_updated_[id] = false;
 
     //id_data_vec_mapの中身を確認
     if ( varbose_write_cmd_ ) {
@@ -146,7 +144,7 @@ void DynamixelHandler::SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd){
  * @return 読み込みに成功したかどうか
 */
 bool DynamixelHandler::SyncReadStateValues(StateValues target){ set<StateValues> t = {target} ; return SyncReadStateValues( t ); }
-bool DynamixelHandler::SyncReadStateValues(set<StateValues>& list_read_state){
+bool DynamixelHandler::SyncReadStateValues(const set<StateValues>& list_read_state){
     if ( list_read_state.empty() ) return false; // 空なら何もしない
     const StateValues start = *min_element(list_read_state.begin(), list_read_state.end());
     const StateValues end   = *max_element(list_read_state.begin(), list_read_state.end());

@@ -124,17 +124,19 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("ratio_state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
     if (!nh_p.getParam("ratio_config_read", ratio_config_pub_)) ratio_config_pub_ =  0;
     if (!nh_p.getParam("ratio_error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
-    if (!nh_p.getParam("use_slipt_read",    use_slipt_read_)) use_slipt_read_   =  false;
-    if (!nh_p.getParam("use_fast_read",     use_fast_read_ )) use_fast_read_    =  true;    
-    if (!nh_p.getParam("varbose_mainloop",  varbose_mainloop_  )) varbose_mainloop_  =  false;
-    bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp   ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
-    if (!nh_p.getParam("varbose_callback",  varbose_callback_  )) varbose_callback_  =  false;
+    if (!nh_p.getParam("use_slipt_write", use_slipt_write_)) use_slipt_write_   =  false;
+    if (!nh_p.getParam("use_slipt_read",  use_slipt_read_ )) use_slipt_read_   =  false;
+    if (!nh_p.getParam("use_fast_read",   use_fast_read_  )) use_fast_read_    =  true;    
     if (!nh_p.getParam("varbose_write_cmd", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
     if (!nh_p.getParam("varbose_write_cfg", varbose_write_cfg_ )) varbose_write_cfg_ =  false;
     if (!nh_p.getParam("varbose_read_st",     varbose_read_st_     )) varbose_read_st_     =  false;
     if (!nh_p.getParam("varbose_read_st_err", varbose_read_st_err_ )) varbose_read_st_err_ =  false;
     if (!nh_p.getParam("varbose_read_hwerr",  varbose_read_hwerr_  )) varbose_read_hwerr_  =  false;
     if (!nh_p.getParam("varbose_read_cfg",    varbose_read_cfg_    )) varbose_read_cfg_    =  false;
+    if (!nh_p.getParam("varbose_callback", varbose_callback_ )) varbose_callback_  =  false;
+    if (!nh_p.getParam("varbose_mainloop", varbose_mainloop_ )) varbose_mainloop_  =  false;
+    bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
+
 
     //  readする情報の設定
     // todo rosparamで設定できるようにする
@@ -163,12 +165,23 @@ bool DynamixelHandler::Initialize(){
     return true;
 }
 
+using std::chrono::system_clock;
+using std::chrono::duration_cast;
+using std::chrono::microseconds;
+
 void DynamixelHandler::MainLoop(){
     static int cnt = -1; cnt++;
     static ros::Rate rate(loop_rate_);
 
     //* デバック
-    if ( varbose_mainloop_ !=0 && cnt % varbose_mainloop_ == 0) ROS_INFO("MainLoop [%d]", cnt);
+    static float rtime = 0.0, wtime = 0.0;
+    if ( varbose_mainloop_ !=0 ) 
+    if ( cnt % varbose_mainloop_ == 0) {
+        ROS_INFO("MainLoop [%d]: read=%.2f ms, write=%.2f ms", cnt, rtime/varbose_mainloop_, wtime/varbose_mainloop_);
+        rtime = 0.0; wtime = 0.0;
+    }
+        
+    /*　処理時間時間の計測 */ auto rstart = system_clock::now();
 
     // //* Dynamixelから状態Read & topicをPublish
     static bool is_st_suc = false;
@@ -196,9 +209,19 @@ void DynamixelHandler::MainLoop(){
         // if (is_gain_suc) BroadcastDxlConfig_Gain();
     }
 
+    /*　処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
+
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();
-    SyncWriteCmdValues(list_wirte_cmd_);
+
+    /*　処理時間時間の計測 */ auto wstart = system_clock::now();
+
+    if ( !use_slipt_write_ ) SyncWriteCmdValues(list_wirte_cmd_);
+    else for (auto each_cmd : list_wirte_cmd_) SyncWriteCmdValues(each_cmd); 
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) is_cmd_updated_[id] = false;
+    list_wirte_cmd_.clear();
+
+    /*　処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 }
 
 int main(int argc, char **argv) {

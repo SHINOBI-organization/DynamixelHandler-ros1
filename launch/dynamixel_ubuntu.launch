@@ -20,8 +20,9 @@
         <param name="ratio_error_read"  value="1000"/> <!-- この回数に一回 Hardware error を読み取る -->
         
         <!-- Read方式 -->
-        <param name="use_fast_read"  value="false"/>
+        <param name="use_fast_read"  value="true"/>
         <param name="use_slipt_read" value="false"/>
+        <param name="use_slipt_write" value="false"/>
         
         <!-- デバック用 -->
         <param name="varbose_callback"    value="false"/>

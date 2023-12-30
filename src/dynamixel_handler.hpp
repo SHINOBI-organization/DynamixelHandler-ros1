@@ -101,6 +101,7 @@ class DynamixelHandler {
         static inline int  ratio_state_pub_  = 1; 
         static inline int  ratio_config_pub_ = 100; // 0の時は初回のみ
         static inline int  ratio_error_pub_  = 100;
+        static inline bool use_slipt_write_ = false;
         static inline bool use_slipt_read_  = false;
         static inline bool use_fast_read_   = false;
         static inline int  varbose_mainloop_  = false;
@@ -157,9 +158,9 @@ class DynamixelHandler {
         static inline set<StateValues> list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValues target);
-        static void SyncWriteCmdValues(set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
+        static void SyncWriteCmdValues(const set<CmdValues>& list_wirte_cmd=list_wirte_cmd_);
         static bool SyncReadStateValues(StateValues target);
-        static bool SyncReadStateValues(set<StateValues>& list_read_state=list_read_state_);
+        static bool SyncReadStateValues(const set<StateValues>& list_read_state=list_read_state_);
         static bool SyncReadHardwareError();
 
 
