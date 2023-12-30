@@ -4,50 +4,6 @@
 using namespace dyn_x;
 
 bool DynamixelHandler::TmpTest(){
-    // dyn_comm.Read(), dyn_comm.SyncRead()の結果が一致するかテストする．
-    // 一致しない場合は，dyn_comm.SyncRead()のバグが疑われる．
-
-    auto pos = dyn_comm_.SyncRead(present_position, {2, 3});
-    auto pos2 = dyn_comm_.Read(present_position, 2);
-    auto pos3 = dyn_comm_.Read(present_position, 3);
-    ROS_INFO("pos[2] = %d, pos2 = %d", (int)pos[2], (int)pos2);
-    ROS_INFO("pos[3] = %d, pos3 = %d", (int)pos[3], (int)pos3);
-
-    auto vel = dyn_comm_.SyncRead(present_velocity, {2, 3});
-    auto vel2 = dyn_comm_.Read(present_velocity, 2);
-    auto vel3 = dyn_comm_.Read(present_velocity, 3);
-    ROS_INFO("vel[2] = %d, vel2 = %d", (int)vel[2], (int)vel2);
-    ROS_INFO("vel[3] = %d, vel3 = %d", (int)vel[3], (int)vel3);
-
-    auto pos_vel = dyn_comm_.SyncRead({present_position, present_velocity}, {2, 3});
-    auto pos_vel2 = dyn_comm_.Read({present_position, present_velocity}, 2);
-    auto pos_vel3 = dyn_comm_.Read({present_position, present_velocity}, 3);
-    ROS_INFO("pos pos_vel[2] = %d, pos_vel2 = %d", (int)pos_vel[2][0], (int)pos_vel2[0]);
-    ROS_INFO("vel pos_vel[2] = %d, pos_vel2 = %d", (int)pos_vel[2][1], (int)pos_vel2[1]);
-    ROS_INFO("pos pos_vel[3] = %d, pos_vel3 = %d", (int)pos_vel[3][0], (int)pos_vel3[0]);
-    ROS_INFO("vel pos_vel[3] = %d, pos_vel3 = %d", (int)pos_vel[3][1], (int)pos_vel3[1]);
-
-    // 以下はSyncReadの代わりにSyncRead_fastを使う場合のテスト
-    auto pos_fast = dyn_comm_.SyncRead_fast(present_position, {2, 3});
-    auto pos2_fast = dyn_comm_.Read(present_position, 2);
-    auto pos3_fast = dyn_comm_.Read(present_position, 3);
-    ROS_INFO("pos_fast[2] = %d, pos2_fast = %d", (int)pos_fast[2], (int)pos2_fast);
-    ROS_INFO("pos_fast[3] = %d, pos3_fast = %d", (int)pos_fast[3], (int)pos3_fast);
-
-    auto vel_fast = dyn_comm_.SyncRead_fast(present_velocity, {2, 3});
-    auto vel2_fast = dyn_comm_.Read(present_velocity, 2);
-    auto vel3_fast = dyn_comm_.Read(present_velocity, 3);
-    ROS_INFO("vel_fast[2] = %d, vel2_fast = %d", (int)vel_fast[2], (int)vel2_fast);
-    ROS_INFO("vel_fast[3] = %d, vel3_fast = %d", (int)vel_fast[3], (int)vel3_fast);
-
-    auto pos_vel_fast = dyn_comm_.SyncRead_fast({present_position, present_velocity}, {2, 3});
-    auto pos_vel2_fast = dyn_comm_.Read({present_position, present_velocity}, 2);
-    auto pos_vel3_fast = dyn_comm_.Read({present_position, present_velocity}, 3);
-    ROS_INFO("pos pos_vel_fast[2] = %d, pos_vel2_fast = %d", (int)pos_vel_fast[2][0], (int)pos_vel2_fast[0]);
-    ROS_INFO("vel pos_vel_fast[2] = %d, pos_vel2_fast = %d", (int)pos_vel_fast[2][1], (int)pos_vel2_fast[1]);
-    ROS_INFO("pos pos_vel_fast[3] = %d, pos_vel3_fast = %d", (int)pos_vel_fast[3][0], (int)pos_vel3_fast[0]);
-    ROS_INFO("vel pos_vel_fast[3] = %d, pos_vel3_fast = %d", (int)pos_vel_fast[3][1], (int)pos_vel3_fast[1]);
-
     return false;
 }
 
@@ -63,13 +19,16 @@ bool DynamixelHandler::Initialize(){
     sub_cmd_x_cur_  = nh.subscribe("/dynamixel/cmd/x/current",  10, DynamixelHandler::CallBackDxlCommand_X_Current);
     sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/cmd/x/current_position",  10, DynamixelHandler::CallBackDxlCommand_X_CurrentPosition);
     sub_cmd_x_epos_ = nh.subscribe("/dynamixel/cmd/x/extended_position", 10, DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition);
+    sub_config_gain_ = nh.subscribe("/dynamixel/config/gain/w", 10, DynamixelHandler::CallBackDxlConfig_Gain);
+    sub_config_mode_ = nh.subscribe("/dynamixel/config/mode/w", 10, DynamixelHandler::CallBackDxlConfig_Mode);
+    sub_config_limit_= nh.subscribe("/dynamixel/config/limit/w",10, DynamixelHandler::CallBackDxlConfig_Limit);
 
     pub_state_free_   = nh.advertise<dynamixel_handler::DynamixelStateFree>("/dynamixel/state_free", 10);
     pub_state_        = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
     pub_error_        = nh.advertise<dynamixel_handler::DynamixelError>("/dynamixel/error", 10);
-    pub_config_limit_ = nh.advertise<dynamixel_handler::DynamixelConfig_Limit>("/dynamixel/config/limit", 10);
-    pub_config_gain_  = nh.advertise<dynamixel_handler::DynamixelConfig_Gain>("/dynamixel/config/gain", 10);
-    pub_config_mode_  = nh.advertise<dynamixel_handler::DynamixelConfig_Mode>("/dynamixel/config/mode", 10);
+    pub_config_limit_ = nh.advertise<dynamixel_handler::DynamixelConfig_Limit>("/dynamixel/config/limit/r", 10);
+    pub_config_gain_  = nh.advertise<dynamixel_handler::DynamixelConfig_Gain>("/dynamixel/config/gain/r", 10);
+    pub_config_mode_  = nh.advertise<dynamixel_handler::DynamixelConfig_Mode>("/dynamixel/config/mode/r", 10);
 
     // 通信の開始
     int BAUDRATE; string DEVICE_NAME;
@@ -125,36 +84,42 @@ bool DynamixelHandler::Initialize(){
         return false;
     }
 
+    // 最初の一回は全ての情報をread & publish
+    if ( SyncReadHardwareErrors()  ) BroadcastDxlError();
+    if ( SyncReadCfgParams_Mode()  ) BroadcastDxlConfig_Mode();
+    if ( SyncReadCfgParams_Limit() ) BroadcastDxlConfig_Limit();
+    if ( SyncReadCfgParams_Gain()  ) BroadcastDxlConfig_Gain();
+
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;
     if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
     if (!nh_p.getParam("init_torque_auto_enable",       do_torque_on  )) do_torque_on= true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION, TORQUE_DISABLE);
-        if ( do_torque_on ) TorqueEnable(id);
+        if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
+        if ( do_torque_on )   TorqueOn(id);
     }
 
-    // cmd_values_の内部の情報の初期化
+    // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
-        cmd_values_[id][GOAL_PWM]             = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);    // エラー時は0
-        cmd_values_[id][GOAL_CURRENT]         = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);    // エラー時は0
-        cmd_values_[id][GOAL_VELOCITY]        = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);    // エラー時は0
-        cmd_values_[id][PROFILE_ACCELERATION] = profile_acceleration.pulse2val(dyn_comm_.tryRead(profile_acceleration, id), model_[id]);    // エラー時は0
-        cmd_values_[id][PROFILE_VELOCITY]     = profile_velocity.pulse2val    (dyn_comm_.tryRead(profile_velocity    , id), model_[id]);    // エラー時は0
-        cmd_values_[id][GOAL_POSITION]        = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);    // エラー時は0
+        cmd_values_[id][GOAL_PWM]      = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);
+        cmd_values_[id][GOAL_CURRENT]  = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);
+        cmd_values_[id][GOAL_VELOCITY] = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);
+        cmd_values_[id][PROFILE_ACC]   = profile_acceleration.pulse2val(dyn_comm_.tryRead(profile_acceleration, id), model_[id]);
+        cmd_values_[id][PROFILE_VEL]   = profile_velocity.pulse2val    (dyn_comm_.tryRead(profile_velocity    , id), model_[id]);
+        cmd_values_[id][GOAL_POSITION] = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);
     }
 
     //  readする情報の設定
     list_read_state_ = {
-        PRESENT_PWM          ,
+        // PRESENT_PWM          ,
         PRESENT_CURRENT      ,
         PRESENT_VELOCITY     ,
         PRESENT_POSITION     ,
         VELOCITY_TRAJECTORY  ,
         POSITION_TRAJECTORY  ,
-        PRESENT_INPUT_VOLTAGE,
-        PRESENT_TEMPERTURE   ,
+        // PRESENT_INPUT_VOLTAGE,
+        // PRESENT_TEMPERTURE   ,
     };
 
     return true;
@@ -194,17 +159,17 @@ void DynamixelHandler::MainLoop(){
         if (is_st_suc) BroadcastDxlState();
     }
     if ( ratio_error_pub_!=0 )
-    if ( has_any_hardware_error_ && cnt % ratio_error_pub_ == 0 ) { // 直前が失敗している場合 or ratio_error_pub_の割合で実行
-        bool is_err_suc = SyncReadHardwareError();
+    if ( cnt % ratio_error_pub_ == 0 ) { // ratio_error_pub_の割合で実行
+        bool is_err_suc = SyncReadHardwareErrors();
         if (is_err_suc) BroadcastDxlError();
     }
     if ( ratio_config_pub_!=0 )
     if ( cnt % ratio_config_pub_ == 0 ) { // ratio_config_pub_の割合で実行
-        bool is_mode_suc = SyncReadConfigParameter_Mode();
+        bool is_mode_suc = SyncReadCfgParams_Mode();
         if (is_mode_suc) BroadcastDxlConfig_Mode();
-        bool is_lim_suc = SyncReadConfigParameter_Limit();
-        if (is_lim_suc) BroadcastDxlConfig_Limit();
-        bool is_gain_suc = SyncReadConfigParameter_Gain();
+        bool is_lim_suc = SyncReadCfgParams_Limit();
+        if (is_lim_suc)  BroadcastDxlConfig_Limit();
+        bool is_gain_suc = SyncReadCfgParams_Gain();
         if (is_gain_suc) BroadcastDxlConfig_Gain();
     }
 
@@ -225,15 +190,24 @@ void DynamixelHandler::MainLoop(){
     /*　処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 }
 
-int main(int argc, char **argv) {
-    ros::init(argc, argv, "dynamixel_handler_node");
+void DynamixelHandler::Terminate(int sig){
+    ROS_INFO("Terminating DynamixelHandler ...");
+    ros::shutdown();
+    for(auto id : id_list_) StopRotation(id);
+}
 
+#include <signal.h>
+
+int main(int argc, char **argv) {
+    ros::init(argc, argv, "dynamixel_handler_node", ros::init_options::NoSigintHandler);
     if ( !DynamixelHandler::Initialize() ) {
         ROS_ERROR("Failed to initialize DynamixelHandler");
         return 0;
     }
+    signal(SIGINT, DynamixelHandler::Terminate);
 
     while(ros::ok()) {
         DynamixelHandler::MainLoop();
     }
+
 }

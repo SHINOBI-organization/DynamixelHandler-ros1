@@ -10,18 +10,15 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
     id_list_.clear();
     for (int id = 0; id <= id_max; id++) {
         if ( !dyn_comm_.tryPing(id) ) continue;
-        auto op_mode = dyn_comm_.tryRead(operating_mode, id);
         auto dyn_model = dyn_comm_.tryRead(model_number, id);
         switch ( dynamixel_series(dyn_model) ) { 
             case SERIES_X: ROS_INFO(" * X series servo id [%d] is found", id);
                 model_[id] = dyn_model;
                 series_[id] = SERIES_X;
-                op_mode_[id] = op_mode;
                 id_list_.push_back(id); break;
             case SERIES_P: ROS_INFO(" * P series servo id [%d] is found", id);
                 model_[id] = dyn_model;
                 series_[id] = SERIES_P;
-                op_mode_[id] = op_mode;
                 id_list_.push_back(id); break;
             default: ROS_WARN(" * Unkwon model [%d] servo id [%d] is found", (int)dyn_model, id);
         }
@@ -31,7 +28,7 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 }
 
 // 
-bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after_state){
+bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after){
     if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
 
     auto now_pos = ReadPresentPosition(id);
@@ -42,53 +39,59 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
     sleep_for(0.5s);
 
     WriteHomingOffset(id, now_rot*(2*M_PI));
-    after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
+    if( after == TORQUE_ENABLE ) TorqueOn(id);
 
     bool is_clear = ReadHardwareError(id) == 0b00000000;
-    if (is_clear) ROS_INFO ("Servo id [%d] is cleared error", id);
-    else          ROS_ERROR("Servo id [%d] failed to clear error", id);
+    if (is_clear) ROS_INFO ("ClearHardwareError: ID [%d] is cleared error", id);
+    else          ROS_ERROR("ClearHardwareError: ID [%d] failed to clear error", id);
     return is_clear;
 }
 
-bool DynamixelHandler::TorqueEnable(uint8_t id){
-    // 角度を同期する
-    auto now_pos = ReadPresentPosition(id);
-    cmd_values_[id][GOAL_POSITION]      = now_pos;
-    state_values_[id][PRESENT_POSITION] = now_pos;
-    WritePresentPosition(id, now_pos);
-    // トルクオン
-    dyn_comm_.tryWrite(torque_enable, id, TORQUE_ENABLE);
-    bool is_enable = dyn_comm_.tryRead(torque_enable, id) == TORQUE_ENABLE;
-    if ( !is_enable ) ROS_ERROR("Servo id [%d] failed to enable torque", id);
+bool DynamixelHandler::TorqueOn(uint8_t id){
+    // 角度の同期と速度の停止
+    if ( !StopRotation(id) ) return false;//この処理が失敗すると危険なので，トルク入れない．
+    // トルクを入れる
+    WriteTorqueEnable(id, TORQUE_ENABLE);
+    // 結果を確認
+    bool is_enable = TORQUE_ENABLE == ReadTorqueEnable(id);
+    if ( !is_enable ) ROS_ERROR("TorqueOn: ID [%d] failed to enable torque", id);
     return is_enable;
 }
 
-bool DynamixelHandler::TorqueDisable(uint8_t id){
-    dyn_comm_.tryWrite(torque_enable, id, TORQUE_DISABLE);
-    bool is_disable = dyn_comm_.tryRead(torque_enable, id) == TORQUE_DISABLE;
-    if ( !is_disable ) ROS_ERROR("Servo id [%d] failed to disable torque", id);
+bool DynamixelHandler::TorqueOff(uint8_t id){
+    // トルクを切る
+    WriteTorqueEnable(id, TORQUE_DISABLE);
+    // 結果を確認
+    bool is_disable = TORQUE_DISABLE == ReadTorqueEnable(id);
+    if ( !is_disable ) ROS_ERROR("TorqueOff: ID [%d] failed to disable torque", id);
     return is_disable;
 }
 
-bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after_state){
+bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after){
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
     if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
-
-    TorqueDisable(id); // 変更のためにトルクオフ
-
-    dyn_comm_.tryWrite(operating_mode, id, mode);
-
-    after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
-
-    bool is_changed = dyn_comm_.tryRead(operating_mode, id) == mode;
+    /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
+    /* モードを変更 */    WriteOperatingMode(id, mode);
+    /* トルクを戻す */    WriteTorqueEnable(id, after);  // 動作中にこの関数が呼ばれることも考えて, TorqueOnは使わない
+    // 結果を確認
+    bool is_changed = mode == ReadOperatingMode(id);
     if ( is_changed ) {
         op_mode_[id] = mode;
         when_op_mode_updated_[id] = Time::now();
-        ROS_INFO("Servo id [%d] is changed operating mode [%d]", id, mode);
+        ROS_INFO("ChangeOperatingMode: ID [%d] is changed operating mode [%d]", id, mode);
     } else {
-        ROS_ERROR("Servo id [%d] failed to change operating mode", id); 
+        ROS_ERROR("ChangeOperatingMode: ID [%d] failed to change operating mode", id); 
     }
     return is_changed;
+}
+
+bool DynamixelHandler::StopRotation(uint8_t id){
+    auto now_pos = ReadPresentPosition(id);
+    cmd_values_[id][GOAL_POSITION]      = now_pos;
+    state_values_[id][PRESENT_POSITION] = now_pos;
+    if ( !WriteGoalPosition(id, now_pos) ) return false; 
+    if ( !WriteGoalVelocity(id, 0.0)     ) return false; //この処理が失敗すると危険なので，トルク入れない．
+    return true;
 }
 
 //* 基本機能たち
@@ -102,9 +105,9 @@ double DynamixelHandler::ReadPresentPosition(uint8_t id){
     return present_position.pulse2val(pos_pulse, model_[id]);
 }
 
-bool DynamixelHandler::WritePresentPosition(uint8_t id, double pos){
-    auto pos_pulse = present_position.val2pulse(pos, model_[id]);
-    return dyn_comm_.tryWrite(present_position, id, pos_pulse);
+bool DynamixelHandler::WriteGoalPosition(uint8_t id, double pos){
+    auto pos_pulse = goal_position.val2pulse(pos, model_[id]);
+    return dyn_comm_.tryWrite(goal_position, id, pos_pulse);
 }
 
 double DynamixelHandler::ReadHomingOffset(uint8_t id){
@@ -115,6 +118,27 @@ double DynamixelHandler::ReadHomingOffset(uint8_t id){
 bool DynamixelHandler::WriteHomingOffset(uint8_t id, double offset){
     auto offset_pulse = homing_offset.val2pulse(offset, model_[id]);
     return dyn_comm_.tryWrite(homing_offset, id, offset_pulse);
+}
+
+bool DynamixelHandler::WriteGoalVelocity(uint8_t id, double vel){
+    auto vel_pulse = goal_velocity.val2pulse(vel, model_[id]);
+    return dyn_comm_.tryWrite(goal_velocity, id, vel_pulse);
+}
+
+bool DynamixelHandler::ReadTorqueEnable(uint8_t id){
+    return dyn_comm_.tryRead(torque_enable, id);
+}
+
+bool DynamixelHandler::WriteTorqueEnable(uint8_t id, bool enable){
+    return dyn_comm_.tryWrite(torque_enable, id, enable ? TORQUE_ENABLE : TORQUE_DISABLE);
+}
+
+uint8_t DynamixelHandler::ReadOperatingMode(uint8_t id){
+    return dyn_comm_.tryRead(operating_mode, id);
+}
+
+bool DynamixelHandler::WriteOperatingMode(uint8_t id, uint8_t mode){
+    return dyn_comm_.tryWrite(operating_mode, id, mode);
 }
 
 //* Main loop 内で使う全モータへの一括読み書き関数たち
@@ -173,7 +197,7 @@ bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_st
     vector<uint8_t> target_id_list;
     for (auto id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
 
-    auto id_data_vec_map = (use_fast_read_&& !is_timeout_read_state_) //  fast readを使う設定かつ，直前でタイムアウトしていない場合はfast readを使う
+    auto id_data_vec_map = (use_fast_read_) //  fast readを使う設定の場合はfast readを使う 途中で切り替えるとtimeout後に来るデータによってSyncReadが何度も失敗するので注意
         ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
         : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
     is_timeout_read_state_     = dyn_comm_.timeout_last_read();
@@ -209,18 +233,32 @@ bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_st
     return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
+void DynamixelHandler::SyncWriteCfgParams_Mode(){
+    return;
+}
+
+void DynamixelHandler::SyncWriteCfgParams_Gain(){
+    return;
+}
+
+void DynamixelHandler::SyncWriteCfgParams_Limit(){
+    return;
+}
+
 /**
  * @func SyncReadHardwareError
  * @brief ハードウェアエラーを読み込む
  * @return 読み込みに成功したかどうか
 */
-bool DynamixelHandler::SyncReadHardwareError(){
+bool DynamixelHandler::SyncReadHardwareErrors(){
+    if ( !has_any_hardware_error_ ) {hardware_error_.clear(); return true;} // 事前にエラーが検出できていない場合は省略
+
     vector<uint8_t> target_id_list;
     for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
     
     auto id_error_map = dyn_comm_.SyncRead(hardware_error_status, target_id_list);
-    if (dyn_comm_.timeout_last_read()   ) return false; // 読み込み失敗
-    if (dyn_comm_.comm_error_last_read()) return false; // 読み込み失敗
+    // if (dyn_comm_.timeout_last_read()   ) return false; // 読み込み失敗
+    // if (dyn_comm_.comm_error_last_read()) return false; // 読み込み失敗
 
     //  hardware_error_に反映
     for ( auto pair : id_error_map ){
@@ -249,15 +287,15 @@ bool DynamixelHandler::SyncReadHardwareError(){
     return true;
 }
 
-bool DynamixelHandler::SyncReadConfigParameter_Mode(){
+bool DynamixelHandler::SyncReadCfgParams_Mode(){
     return false;
 }
 
-bool DynamixelHandler::SyncReadConfigParameter_Gain(){
+bool DynamixelHandler::SyncReadCfgParams_Gain(){
     return false;
 }
 
-bool DynamixelHandler::SyncReadConfigParameter_Limit(){
+bool DynamixelHandler::SyncReadCfgParams_Limit(){
     return false;
 }
 
@@ -269,9 +307,9 @@ void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::Dynamixel
     if (msg.command == "clear")
         for (auto id : id_list) ClearHardwareError(id);
     if (msg.command == "enable") 
-        for (auto id : id_list) TorqueEnable(id);
+        for (auto id : id_list) TorqueOn(id);
     if (msg.command == "disable")
-        for (auto id : id_list) TorqueDisable(id);
+        for (auto id : id_list) TorqueOff(id);
     if (msg.command == "reboot") 
         for (auto id : id_list) dyn_comm_.Reboot(id);
 }
@@ -282,7 +320,7 @@ void DynamixelHandler::CallBackDxlCommand_Option(const dynamixel_handler::Dynami
 
 void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Position"); // msg.id_listと同じサイズの奴だけ処理する
-    if ( msg.id_list.size() != msg.position__deg.size() ) { ROS_ERROR(" - Element size dismatch"); return;}
+    if ( msg.id_list.size() != msg.position__deg.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -292,12 +330,12 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
         list_wirte_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_POSITION);
     }
-    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
+    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Velocity"); // msg.id_listと同じサイズの奴だけ処理する
-    if ( msg.id_list.size() != msg.velocity__deg_s.size() ) { ROS_ERROR(" - Element size dismatch"); return;}
+    if ( msg.id_list.size() != msg.velocity__deg_s.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -307,12 +345,12 @@ void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::Dy
         list_wirte_cmd_.insert(GOAL_VELOCITY);
         ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
     }
-    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_velocity are updated", (int)msg.id_list.size());
+    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_velocity are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Current"); // msg.id_listと同じサイズの奴だけ処理する
-    if ( msg.id_list.size() != msg.current__mA.size() ) { ROS_ERROR(" - Element size dismatch"); return;}
+    if ( msg.id_list.size() != msg.current__mA.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -322,14 +360,14 @@ void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::Dyn
         list_wirte_cmd_.insert(GOAL_CURRENT);
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
     }
-    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_current are updated", (int)msg.id_list.size());
+    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_current are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_handler::DynamixelCommand_X_ControlCurrentPosition& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_CurrentPosition"); // msg.id_listと同じサイズの奴だけ処理する
     const bool do_process_cur = msg.id_list.size() == msg.current__mA.size();
     const bool do_process_pos = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
-    if ( !do_process_cur && !do_process_pos ) { ROS_ERROR(" - Element size dismatch"); return;}
+    if ( !do_process_cur && !do_process_pos ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -348,14 +386,14 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
         }
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
     }
-    if (varbose_callback_ && do_process_cur) ROS_INFO(" -  %d servo(s) goal_current are updated", (int)msg.id_list.size());
-    if (varbose_callback_ && do_process_pos) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
+    if (varbose_callback_ && do_process_cur) ROS_INFO(" - %d servo(s) goal_current are updated", (int)msg.id_list.size());
+    if (varbose_callback_ && do_process_pos) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_ExtendedPosition");
     const bool do_process = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
-    if ( !do_process ) { ROS_ERROR(" - Element size dismatch"); return;}
+    if ( !do_process ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
@@ -366,7 +404,49 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
         list_wirte_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
     }
-    if (varbose_callback_) ROS_INFO(" -  %d servo(s) goal_position are updated", (int)msg.id_list.size());
+    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
+}
+
+void DynamixelHandler::CallBackDxlConfig_Gain(const dynamixel_handler::DynamixelConfig_Gain& msg) {
+    if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Gain");
+    bool is_any = false;
+    if (msg.id_list.size() == msg.velocity_i_gain__pulse.size()){ is_any=true;}
+    if (msg.id_list.size() == msg.velocity_p_gain__pulse.size()){ is_any=true;}
+    if (msg.id_list.size() == msg.position_d_gain__pulse.size()){ is_any=true;}
+    if (msg.id_list.size() == msg.position_i_gain__pulse.size()){ is_any=true;}
+    if (msg.id_list.size() == msg.position_p_gain__pulse.size()){ is_any=true;}
+    if (msg.id_list.size() == msg.feedforward_acc_gain__pulse.size()){ is_any=true;}
+    if (msg.id_list.size() == msg.feedforward_vel_gain__pulse.size()){ is_any=true;}
+    if (varbose_callback_) {
+         if (is_any) ROS_INFO(" - %d servo(s) gain are updated", (int)msg.id_list.size());
+         else                  ROS_ERROR(" - Element size dismatch");
+    }
+}
+
+void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::DynamixelConfig_Limit& msg) {
+    if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Limit");
+    bool is_any = false;
+
+    if (msg.id_list.size() == msg.homing_offset__deg.size()        ){is_any=true;}
+    if (msg.id_list.size() == msg.moving_threshold__deg_s.size()   ){is_any=true;}
+    if (msg.id_list.size() == msg.temperature_limit__degC.size()   ){is_any=true;}
+    if (msg.id_list.size() == msg.max_voltage_limit__V.size()      ){is_any=true;}
+    if (msg.id_list.size() == msg.min_voltage_limit__V.size()      ){is_any=true;}
+    if (msg.id_list.size() == msg.pwm_limit__degree.size()         ){is_any=true;}
+    if (msg.id_list.size() == msg.current_limit__mA.size()         ){is_any=true;}
+    if (msg.id_list.size() == msg.acceleration_limit__deg_ss.size()){is_any=true;}
+    if (msg.id_list.size() == msg.velocity_limit__deg_s.size()     ){is_any=true;}
+    if (msg.id_list.size() == msg.max_position_limit__deg.size()   ){is_any=true;}
+    if (msg.id_list.size() == msg.min_position_limit__deg.size()   ){is_any=true;}
+
+    if (varbose_callback_) {
+         if (is_any) ROS_INFO(" - %d servo(s) limit are updated", (int)msg.id_list.size());
+         else                  ROS_ERROR(" - Element size dismatch");
+    }
+}
+
+void DynamixelHandler::CallBackDxlConfig_Mode(const dynamixel_handler::DynamixelConfig_Mode& msg) {
+ 
 }
 
 void DynamixelHandler::BroadcastDxlStateFree(){

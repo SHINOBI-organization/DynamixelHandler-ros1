@@ -56,18 +56,20 @@ class DynamixelHandler {
         static bool TmpTest();
         static bool Initialize();
         static void MainLoop();
+        static void Terminate(int sig);
+
         //* ROS publishを担う関数と subscliber callback関数
         static void BroadcastDxlState();
-        static void BroadcastDxlStateFree();
+        static void BroadcastDxlStateFree(); // todo 
         static void BroadcastDxlError();
-        static void BroadcastDxlConfig_Limit();
-        static void BroadcastDxlConfig_Gain();
-        static void BroadcastDxlConfig_Mode();
-        static void CallBackDxlConfig_Limit (const dynamixel_handler::DynamixelConfig_Limit& msg);
-        static void CallBackDxlConfig_Gain  (const dynamixel_handler::DynamixelConfig_Gain& msg);
-        static void CallBackDxlConfig_Mode  (const dynamixel_handler::DynamixelConfig_Mode& msg);
-        static void CallBackDxlCommandFree    (const dynamixel_handler::DynamixelCommandFree& msg);
-        static void CallBackDxlCommand_Option (const dynamixel_handler::DynamixelCommand_Option& msg);
+        static void BroadcastDxlConfig_Limit(); // todo
+        static void BroadcastDxlConfig_Gain();  // todo
+        static void BroadcastDxlConfig_Mode();  // todo
+        static void CallBackDxlConfig_Limit (const dynamixel_handler::DynamixelConfig_Limit& msg); // todo
+        static void CallBackDxlConfig_Gain  (const dynamixel_handler::DynamixelConfig_Gain& msg);  // todo
+        static void CallBackDxlConfig_Mode  (const dynamixel_handler::DynamixelConfig_Mode& msg);  // todo
+        static void CallBackDxlCommandFree    (const dynamixel_handler::DynamixelCommandFree& msg);    // todo
+        static void CallBackDxlCommand_Option (const dynamixel_handler::DynamixelCommand_Option& msg); // todo
         static void CallBackDxlCommand_X_Position        (const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg);
         static void CallBackDxlCommand_X_Velocity        (const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg);
         static void CallBackDxlCommand_X_Current         (const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg);
@@ -87,21 +89,30 @@ class DynamixelHandler {
         static inline ros::Subscriber sub_cmd_x_cur_;
         static inline ros::Subscriber sub_cmd_x_cpos_;
         static inline ros::Subscriber sub_cmd_x_epos_;
+        static inline ros::Subscriber sub_config_limit_;
+        static inline ros::Subscriber sub_config_gain_;
+        static inline ros::Subscriber sub_config_mode_;
 
     private:
         DynamixelHandler() = delete;
         //* Dynamixelとの通信を超えた機能
         static uint8_t ScanDynamixels(uint8_t id_max);
-        static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
-        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode, DynamixelTorquePermission after_state=TORQUE_ENABLE);
-        static bool TorqueEnable(uint8_t servo_id);
-        static bool TorqueDisable(uint8_t servo_id);
+        static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after=TORQUE_ENABLE);
+        static bool TorqueOn(uint8_t servo_id);
+        static bool TorqueOff(uint8_t servo_id);
+        static bool StopRotation(uint8_t servo_id);
+        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode, DynamixelTorquePermission after=TORQUE_ENABLE);
     //* Dynamixel単体との通信の組み合わせ
         static uint8_t ReadHardwareError(uint8_t servo_id);
-        static double ReadPresentPosition(uint8_t servo_id);
-        static double ReadHomingOffset(uint8_t servo_id);
-        static bool WritePresentPosition(uint8_t servo_id, double position);
+        static double  ReadPresentPosition(uint8_t servo_id);
+        static double  ReadHomingOffset(uint8_t servo_id);
+        static bool    ReadTorqueEnable(uint8_t servo_id);
+        static uint8_t ReadOperatingMode(uint8_t servo_id);
+        static bool WriteGoalPosition(uint8_t servo_id, double position);
+        static bool WriteGoalVelocity(uint8_t servo_id, double velocity);
         static bool WriteHomingOffset(uint8_t servo_id, double offset);
+        static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
+        static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
 
     
         //* 各種のフラグとパラメータ
@@ -124,12 +135,12 @@ class DynamixelHandler {
         static inline DynamixelComunicator dyn_comm_;
         //* Dynamixelを扱うための変数群 
         enum CmdValueIndex { //　cmd_values_のIndex, サーボに毎周期で書き込むことができる値
-            GOAL_PWM             = 0,
-            GOAL_CURRENT         = 1,
-            GOAL_VELOCITY        = 2,
-            PROFILE_ACCELERATION = 3,
-            PROFILE_VELOCITY     = 4,
-            GOAL_POSITION        = 5,
+            GOAL_PWM      = 0,
+            GOAL_CURRENT  = 1,
+            GOAL_VELOCITY = 2,
+            PROFILE_ACC   = 3,
+            PROFILE_VEL   = 4,
+            GOAL_POSITION = 5,
         };
         enum StValueIndex { // state_values_のIndex, サーボから毎周期で読み込むことができる値
             PRESENT_PWM          = 0,
@@ -153,8 +164,8 @@ class DynamixelHandler {
         static inline vector<uint8_t> id_list_; // chained dynamixel id list
         static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
         static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
-        static inline map<uint8_t, uint8_t> op_mode_; // 各dynamixelの id と 動作モード のマップ
         // 連結しているサーボの個々の状態を保持するmap
+        static inline map<uint8_t, uint8_t> op_mode_; // 各dynamixelの id と 制御モード のマップ
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValueIndexに対応する
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStValueIndexに対応する
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHWErrIndexに対応する
@@ -165,17 +176,20 @@ class DynamixelHandler {
         static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
         static inline bool is_timeout_read_state_     = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
         // 各周期で実行するserial通信の内容を決めるためのset
-        static inline set<CmdValueIndex>   list_wirte_cmd_  = {};
-        static inline set<StValueIndex> list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
+        static inline set<CmdValueIndex> list_wirte_cmd_  = {};
+        static inline set<StValueIndex>  list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCmdValues(CmdValueIndex target);
         static void SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_cmd=list_wirte_cmd_);
+        static void SyncWriteCfgParams_Mode();  // todo 
+        static void SyncWriteCfgParams_Gain();  // todo 
+        static void SyncWriteCfgParams_Limit(); // todo 
         static bool SyncReadStateValues(StValueIndex target);
         static bool SyncReadStateValues(const set<StValueIndex>& list_read_state=list_read_state_);
-        static bool SyncReadHardwareError();
-        static bool SyncReadConfigParameter_Mode();
-        static bool SyncReadConfigParameter_Gain();
-        static bool SyncReadConfigParameter_Limit();
+        static bool SyncReadHardwareErrors();
+        static bool SyncReadCfgParams_Mode();  // todo
+        static bool SyncReadCfgParams_Gain();  // todo
+        static bool SyncReadCfgParams_Limit(); // todo
 };
 
 namespace dyn_x{
