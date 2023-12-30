@@ -85,6 +85,7 @@ bool DynamixelHandler::Initialize(){
     }
 
     // 最初の一回は全ての情報をread & publish
+    if ( SyncReadStateValues()     ) BroadcastDxlState();
     if ( SyncReadHardwareErrors()  ) BroadcastDxlError();
     if ( SyncReadCfgParams_Mode()  ) BroadcastDxlConfig_Mode();
     if ( SyncReadCfgParams_Limit() ) BroadcastDxlConfig_Limit();
@@ -142,9 +143,9 @@ void DynamixelHandler::MainLoop(){
         rtime = 0.0; wtime = 0.0; suc_read_part=0.0; suc_read_full=0.0, num_st_read=0.001;
     }
         
-/*　処理時間時間の計測 */ auto rstart = system_clock::now();
+/* 処理時間時間の計測 */ auto rstart = system_clock::now();
 
-    // //* Dynamixelから状態Read & topicをPublish
+    //* Dynamixelから状態Read & topicをPublish
     static bool is_st_suc = false;
     if ( ratio_state_pub_!=0 ) 
     if ( !is_st_suc || cnt % ratio_state_pub_ == 0 ) { //直前が失敗している場合 or ratio_state_pub_の割合で実行
@@ -165,7 +166,7 @@ void DynamixelHandler::MainLoop(){
     }
     if ( ratio_config_pub_!=0 )
     if ( cnt % ratio_config_pub_ == 0 ) { // ratio_config_pub_の割合で実行
-        bool is_mode_suc = SyncReadCfgParams_Mode();
+        bool is_mode_suc = SyncReadCfgParams_Mode(); // 処理を追加する可能性を考えて，変数を別で用意する冗長な書き方をしている．
         if (is_mode_suc) BroadcastDxlConfig_Mode();
         bool is_lim_suc = SyncReadCfgParams_Limit();
         if (is_lim_suc)  BroadcastDxlConfig_Limit();
@@ -173,13 +174,13 @@ void DynamixelHandler::MainLoop(){
         if (is_gain_suc) BroadcastDxlConfig_Gain();
     }
 
-/*　処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
+/* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
+
+
+/* 処理時間時間の計測 */ auto wstart = system_clock::now();
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
-    /* SubscribeDynamixelCmd */ros::spinOnce(); rate.sleep();
-
-/*　処理時間時間の計測 */ auto wstart = system_clock::now();
-
+    /* SubscribeDynamixelCmd */ros::spinOnce();
     if ( !use_slipt_write_ ) 
         SyncWriteCmdValues(list_wirte_cmd_);
     else for (auto each_cmd : list_wirte_cmd_) 
@@ -187,7 +188,9 @@ void DynamixelHandler::MainLoop(){
     is_cmd_updated_.clear();
     list_wirte_cmd_.clear();
 
-/*　処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
+/* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
+
+    rate.sleep();
 }
 
 void DynamixelHandler::Terminate(int sig){
