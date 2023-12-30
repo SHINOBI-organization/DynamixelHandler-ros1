@@ -98,9 +98,9 @@ class DynamixelHandler {
 
         //* 各種のフラグとパラメータ
         static inline int  loop_rate_    = 50;
-        static inline int  state_pub_ratio_  = 1; 
-        static inline int  config_pub_ratio_ = 100; // 0の時は初回のみ
-        static inline int  error_pub_ratio_  = 100;
+        static inline int  ratio_state_pub_  = 1; 
+        static inline int  ratio_config_pub_ = 100; // 0の時は初回のみ
+        static inline int  ratio_error_pub_  = 100;
         static inline bool use_slipt_read_  = false;
         static inline bool use_fast_read_   = false;
         static inline int  varbose_mainloop_  = false;

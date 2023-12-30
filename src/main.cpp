@@ -121,9 +121,9 @@ bool DynamixelHandler::Initialize(){
 
     // main loop の設定
     if (!nh_p.getParam("loop_rate",        loop_rate_ )) loop_rate_ =  50;
-    if (!nh_p.getParam("state_read_ratio",  state_pub_ratio_ )) state_pub_ratio_  =  1;
-    if (!nh_p.getParam("config_read_ratio", config_pub_ratio_)) config_pub_ratio_ =  0;
-    if (!nh_p.getParam("error_read_ratio",  error_pub_ratio_ )) error_pub_ratio_  =  100;
+    if (!nh_p.getParam("ratio_state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
+    if (!nh_p.getParam("ratio_config_read", ratio_config_pub_)) ratio_config_pub_ =  0;
+    if (!nh_p.getParam("ratio_error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
     if (!nh_p.getParam("use_slipt_read",    use_slipt_read_)) use_slipt_read_   =  false;
     if (!nh_p.getParam("use_fast_read",     use_fast_read_ )) use_fast_read_    =  true;    
     if (!nh_p.getParam("varbose_mainloop",  varbose_mainloop_  )) varbose_mainloop_  =  false;
@@ -171,21 +171,29 @@ void DynamixelHandler::MainLoop(){
     if ( varbose_mainloop_ !=0 && cnt % varbose_mainloop_ == 0) ROS_INFO("MainLoop [%d]", cnt);
 
     // //* Dynamixelから状態Read & topicをPublish
-    if ( state_pub_ratio_==0 || cnt % state_pub_ratio_ == 0 ) {
-        bool is_suc = false;
-        if ( !use_slipt_read_ )                      is_suc  = SyncReadStateValues(list_read_state_);
-        else for (StateValues st : list_read_state_) is_suc += SyncReadStateValues(st);
-        if (is_suc) BroadcastDxlState();
+    static bool is_st_suc = false;
+    if ( ratio_state_pub_!=0 ) 
+    if ( !is_st_suc || cnt % ratio_state_pub_ == 0 ) { //直前が失敗している場合 or ratio_state_pub_の割合で実行
+        is_st_suc = false;
+        if ( !use_slipt_read_ ) 
+            is_st_suc  = SyncReadStateValues(list_read_state_);
+        else for (StateValues each_state : list_read_state_) 
+            is_st_suc += SyncReadStateValues(each_state);
+        if (is_st_suc) BroadcastDxlState();
     }
-    if ( config_pub_ratio_!=0 && cnt % config_pub_ratio_ == 0 ) {
-        // const bool is_suc = SyncReadConfigParameter(); W
-        // if (is_suc) BroadcastDxlConfig_Limit();
-        // if (is_suc) BroadcastDxlConfig_Gain();
-        // if (is_suc) BroadcastDxlConfig_Mode();
+    if ( ratio_error_pub_!=0 )
+    if ( has_any_hardware_error_ && cnt % ratio_error_pub_ == 0 ) { // 直前が失敗している場合 or ratio_error_pub_の割合で実行
+        bool is_err_suc = SyncReadHardwareError();
+        // if (is_err_suc) = BroadcastDxlError();
     }
-    if ( error_pub_ratio_!=0  && cnt % error_pub_ratio_ == 0 && has_any_hardware_error_ ) {
-        bool is_suc = SyncReadHardwareError();
-        // if (is_suc) = BroadcastDxlError();
+    if ( ratio_config_pub_!=0 )
+    if ( cnt % ratio_config_pub_ == 0 ) { // ratio_config_pub_の割合で実行
+        // const bool is_mode_suc = SyncReadConfigParameter_Mode();
+        // if (is_mode_suc) BroadcastDxlConfig_Mode();
+        // const bool is_lim_suc = SyncReadConfigParameter_Limit();
+        // if (is_lim_suc) BroadcastDxlConfig_Limit();
+        // const bool is_gain_suc = SyncReadConfigParameter_Gain();
+        // if (is_gain_suc) BroadcastDxlConfig_Gain();
     }
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite

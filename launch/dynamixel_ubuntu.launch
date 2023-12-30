@@ -14,10 +14,10 @@
         <param name="init_hardware_error_auto_clean" value="true"/>
 
         <!-- ループの設定 -->
-        <param name="loop_rate" value="100"/>
-        <param name="state_read_ratio"  value="3"/> 
-        <param name="config_read_ratio" value="0"/>   <!-- 0=初回のみconfigを読み取る -->
-        <param name="error_read_ratio"  value="1000"/> <!-- 100ループに一回 Hardware errorを読み取る -->
+        <param name="loop_rate" value="150"/>
+        <param name="ratio_state_read"  value="1"/>    <!-- この回数に一回 State を読み取る -->
+        <param name="ratio_config_read" value="0"/>    <!-- この回数に一回 Config を読み取る, 0=初回のみ -->
+        <param name="ratio_error_read"  value="1000"/> <!-- この回数に一回 Hardware error を読み取る -->
         
         <!-- Read方式 -->
         <param name="use_fast_read"  value="false"/>
