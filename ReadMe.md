@@ -161,65 +161,68 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 ## Control Table との対応
 
 ### 温度
- - temperature_limit  : 未実装，launchから設定できるようにしたいけど．．．
- - present_temperture : rostopicとしてpubされるようにしたい
+ - temperature_limit  : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - present_temperture : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
 
 ### 電圧
- - max_voltage_limit     : 未実装，launchから設定できるようにしたいけど．．．
- - min_voltage_limit     : 未実装，launchから設定できるようにしたいけど．．．
- - present_input_voltage : rostopicとしてpubされるようにしたい
+ - max_voltage_limit     : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - min_voltage_limit     : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - present_input_voltage : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
 
 ### PWM
- - pwm_limit   : 未実装，launchから設定できるようにしたいけど．．．
- - goal_pwm    : 未実装，特定の型のトピックのcallbackで設定されるようにしたい 
- - present_pwm : rostopicとしてpubされるようにしたい        
+ - pwm_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - goal_pwm    : 未実装，`/dynamixel/cmd/x/pwm`をsubすると設定されるようにしたい
+ - present_pwm : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
 
 ### 電流
- - current_limit   : 未実装，launchから設定できるようにしたいけど．．．
- - goal_current    : 特定の型のトピックのcallbackで設定されるようにしたい 
- - present_current : rostopicとしてpubされるようにしたい
+ - current_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - goal_current    : `/dynamixel/cmd/x/current` or `/dynamixel/cmd/x/current_position`をsubすると設定され，loop_rateの周期で書き込まれる．
+ - present_current : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
 
 ### 加速度
- - acceleration_limit   : 未実装，launchから設定できるようにしたいけど．．．
- - profile_acceleration : 未実装，goal position/velocity書き込み時にオプションとしてつけたい
+ - acceleration_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - profile_acceleration : 未実装，`/dynamixel/cmd/option`をsubすると設定されるようにしたい．
 
 ### 速度
- - velocity_limit      : 未実装，launchから設定できるようにしたいけど．．．
- - goal_velocity       : 特定の型のトピックのcallbackで設定されるようにしたい 
- - present_velocity    : rostopicとしてpubされるようにしたい
- - profile_velocity    : 未実装， goal position書き込み時にオプションとしてつけたい
- - velocity_trajectory : 
+ - velocity_limit      : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - profile_velocity    : 未実装，`/dynamixel/cmd/option`をsubすると設定されるようにしたい．
+ - goal_velocity       : `/dynamixel/cmd/x/velocity`をsubすると設定され，loop_rateの周期で書き込まれる．
+ - present_velocity    : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - velocity_trajectory : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
 
 ### 位置
- - max_position_limit    : 未実装，launchから設定できるようにしたいけど．．．これはかなり必要
- - min_position_limit    : 未実装，launchから設定できるようにしたいけど．．．これはかなり必要
- - goal_position         : /dynamixel/cmdをsubすると設定される．write周期は全体ループと同期
-                           todo 特定の型のトピックのcallbackで設定されるようにしたい 
- - present_position      : rostopicとしてpubされる. read & pub周期は全体ループと同期
- - position_trajectory   : not support
+ - max_position_limit    : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - min_position_limit    : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+ - goal_position         : `/dynamixel/cmd/x/position` or `/dynamixel/cmd/x/current_position` or `/dynamixel/cmd/x/extended_position` をsubすると設定され．loop_rateの周期で書き込まれる．
+ - present_position      : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - position_trajectory   : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
 
 ### PIDパラメータ
- - velocity_i_gain       : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
- - velocity_p_gain       : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
- - position_d_gain       : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
- - position_i_gain       : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
- - position_p_gain       : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
- - feedforward_acc_gain  : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
- - feedforward_vel_gain  : 未実装，launchから設定できるようにしたい, RAMの値なので需要はある
-
+ - velocity_i_gain       : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+ - velocity_p_gain       : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+ - position_d_gain       : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+ - position_i_gain       : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+ - position_p_gain       : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+ - feedforward_acc_gain  : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+ - feedforward_vel_gain  : 未実装，`/dynamixel/config/mode/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+   
 ###  external port
- - external_port_mode_{x} : 未実装，topicから制御できるようにする 
- - external_port_data_{x} : 未実装，topicから制御できるようにする 
+ - external_port_mode_{x} : 未実装，topicから制御できるようにする．
+ - external_port_data_{x} : 未実装，topicから制御できるようにする．
 
 ### 機能系
- - operating_mode         : 未実装，subしたtopicの型に合わせて自動で変わるようにする．
- - drive_mode             : 未実装，pubする
- - homing_offset          : ユーザーは使用不可，reboot時の角度補正に用いる
- - hardware_error_status  : error_ratioの割合でエラーのチェックを回す. 
-                            todo error 検出はstatus packetに任せて詳細のpubに用いる
+ - hardware_error_status  : `/dynamixel/error`としてloop_rate/ratio_read_errorの周期でpubされる. 
  - torque_enable          : 接続時に自動でトルクONされる. 
-                            todo topicからon/off, 初期状態の設定
- - bus_watchbdog          : 未実装，velocity control時に一定時間通信切れで自動停止
+                            `/dynamixel/cmd_free`の`command='eneble'`でON,`command='disable'`でOFFに設定される．
+ - operating_mode         : 対応するtopicのsubで自動で設定される．
+                            未実装，現在値は`/dynamixel/config/mode/r`としてpubされるようにする． 
+                            未実装，`/dynamixel/config/mode/w`をsubして設定されるようにする．
+ - drive_mode             : 未実装，subで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
+                            未実装，`/dynamixel/config/mode/w`をsubして設定されるようにする．
+ - homing_offset          : ユーザーは使用不可，reboot時の角度補正に用いられる．
+ - bus_watchbdog          : 未実装，velocity control時に一定時間通信切れで自動停止するようにする．
+
+### その他
  - moving_threshold       : not support
  - realtime_tick          : not support
  - registered_instruction : not support
