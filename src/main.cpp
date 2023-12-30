@@ -112,7 +112,7 @@ bool DynamixelHandler::Initialize(){
     bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
 
     // id_listの作成
-    int num_expexted, id_max; bool do_clean_hwerr;
+    int num_expexted, id_max; 
     if (!nh_p.getParam("init_expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
     if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
     ROS_INFO("Auto scanning Dynamixel (id range 1 to [%d])", id_max);
@@ -127,15 +127,13 @@ bool DynamixelHandler::Initialize(){
     }
 
     // サーボの初期化
+    bool do_clean_hwerr, do_torque_on;
     if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
+    if (!nh_p.getParam("init_torque_auto_enable",       do_torque_on  )) do_torque_on= true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
-        if ( !TorqueDisable(id) ) ROS_WARN("Servo id [%d] failed to disable torque", id);
-        if ( !dyn_comm_.tryWrite(operating_mode, id, OPERATING_MODE_CURRENT_BASE_POSITION) ) ROS_WARN("Servo id [%d] failed to set operating mode", id);;  
-        if ( !dyn_comm_.tryWrite(profile_acceleration, id, 500)) ROS_WARN("Servo id [%d] failed to set profile_acceleration", id);
-        if ( !dyn_comm_.tryWrite(profile_velocity, id, 100)) ROS_WARN("Servo id [%d] failed to set profile_velocity", id);
-        if ( !dyn_comm_.tryWrite(homing_offset, id, 0)) ROS_WARN("Servo id [%d] failed to set homing_offset", id);
-        if ( !TorqueEnable(id) ) ROS_WARN("Servo id [%d] failed to enable torque", id);
+        // ChangeOperatingMode(id, OPAERATING_MODE_POSITION);        
+        if ( do_torque_on ) TorqueEnable(id);
     }
 
     // cmd_values_の内部の情報の初期化

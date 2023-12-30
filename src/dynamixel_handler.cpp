@@ -2,6 +2,8 @@
 
 using namespace dyn_x;
 
+//* 基本機能をまとめた関数たち
+
 // 各シリーズのDynamixelを検出する．
 uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {   
     id_list_.clear();
@@ -24,23 +26,21 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
     return id_list_.size();
 }
 
+// 
 bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after_state){
-    if ( dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000 ) return true; // エラーがない場合は何もしない
+    if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
 
-    auto now_pos_pulse = dyn_comm_.tryRead(present_position, id);
-    auto now_pos_rad   = present_position.pulse2val(now_pos_pulse, model_[id]);
-    int now_rot = (now_pos_rad+M_PI) / (2*M_PI);
-    if (now_pos_rad < -M_PI) now_rot--;
+    auto now_pos = ReadPresentPosition(id);
+    int now_rot = (now_pos+M_PI) / (2*M_PI);
+    if (now_pos < -M_PI) now_rot--;
 
     dyn_comm_.Reboot(id);
     sleep_for(0.5s);
 
-    auto offset_pulse = homing_offset.val2pulse(now_rot*(2*M_PI), model_[id]);
-    dyn_comm_.tryWrite(homing_offset, id, offset_pulse);
-
+    WriteHomingOffset(id, now_rot*(2*M_PI));
     after_state==TORQUE_ENABLE ? TorqueEnable(id) : TorqueDisable(id);
 
-    bool is_clear = dyn_comm_.tryRead(hardware_error_status, id) == 0b00000000;
+    bool is_clear = ReadHardwareError(id) == 0b00000000;
     if (is_clear) ROS_INFO ("Servo id [%d] is cleared error", id);
     else          ROS_ERROR("Servo id [%d] failed to clear error", id);
     return is_clear;
@@ -48,18 +48,48 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
 
 bool DynamixelHandler::TorqueEnable(uint8_t id){
     // 角度の同期
-    int now_pos = dyn_comm_.tryRead(present_position, id);
-    cmd_values_[id][GOAL_POSITION]      = present_position.pulse2val(now_pos, model_[id]);
-    state_values_[id][PRESENT_POSITION] = present_position.pulse2val(now_pos, model_[id]);
-    dyn_comm_.tryWrite(goal_position, id, now_pos);
+    auto now_pos = ReadPresentPosition(id);
+    cmd_values_[id][GOAL_POSITION]      = now_pos;
+    state_values_[id][PRESENT_POSITION] = now_pos;
+    WritePresentPosition(id, now_pos);
     // トルクオン
     dyn_comm_.tryWrite(torque_enable, id, TORQUE_ENABLE);
-    return dyn_comm_.tryRead(torque_enable, id) == TORQUE_ENABLE;
+    bool is_enable = dyn_comm_.tryRead(torque_enable, id) == TORQUE_ENABLE;
+    if ( !is_enable ) ROS_ERROR("Servo id [%d] failed to enable torque", id);
+    return is_enable;
 }
 
 bool DynamixelHandler::TorqueDisable(uint8_t id){
     dyn_comm_.tryWrite(torque_enable, id, TORQUE_DISABLE);
-    return dyn_comm_.tryRead(torque_enable, id) == TORQUE_DISABLE;
+    bool is_disable = dyn_comm_.tryRead(torque_enable, id) == TORQUE_DISABLE;
+    if ( !is_disable ) ROS_ERROR("Servo id [%d] failed to disable torque", id);
+    return is_disable;
+}
+
+//* 基本機能たち
+
+uint8_t DynamixelHandler::ReadHardwareError(uint8_t id){
+    return dyn_comm_.tryRead(hardware_error_status, id);
+}
+
+double DynamixelHandler::ReadPresentPosition(uint8_t id){
+    auto pos_pulse = dyn_comm_.tryRead(present_position, id);
+    return present_position.pulse2val(pos_pulse, model_[id]);
+}
+
+bool DynamixelHandler::WritePresentPosition(uint8_t id, double pos){
+    auto pos_pulse = present_position.val2pulse(pos, model_[id]);
+    return dyn_comm_.tryWrite(present_position, id, pos_pulse);
+}
+
+double DynamixelHandler::ReadHomingOffset(uint8_t id){
+    auto offset_pulse = dyn_comm_.tryRead(homing_offset, id);
+    return homing_offset.pulse2val(offset_pulse, model_[id]);
+}
+
+bool DynamixelHandler::WriteHomingOffset(uint8_t id, double offset){
+    auto offset_pulse = homing_offset.val2pulse(offset, model_[id]);
+    return dyn_comm_.tryWrite(homing_offset, id, offset_pulse);
 }
 
 /**

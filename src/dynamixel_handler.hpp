@@ -91,12 +91,18 @@ class DynamixelHandler {
         DynamixelHandler() = delete;
         //* Dynamixelとの通信を超えた機能
         static uint8_t ScanDynamixels(uint8_t id_max);
-        //* Dynamixel単体との通信の組み合わせ
+        static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
+        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode);
         static bool TorqueEnable(uint8_t servo_id);
         static bool TorqueDisable(uint8_t servo_id);
-        static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after_state=TORQUE_ENABLE);
-        static bool CheckHardwareError(uint8_t servo_id);
+    //* Dynamixel単体との通信の組み合わせ
+        static uint8_t ReadHardwareError(uint8_t servo_id);
+        static double ReadPresentPosition(uint8_t servo_id);
+        static double ReadHomingOffset(uint8_t servo_id);
+        static bool WritePresentPosition(uint8_t servo_id, double position);
+        static bool WriteHomingOffset(uint8_t servo_id, double offset);
 
+    
         //* 各種のフラグとパラメータ
         static inline int  loop_rate_    = 50;
         static inline int  ratio_state_pub_  = 1; 
