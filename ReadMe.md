@@ -40,9 +40,16 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
  - baudrate を統一し一括変更できる sub node を作成する
  - 電流/速度制御時に通信が途切れたら自動で停止するようにする
  - External Portsをうまいことやる
- - free command topic の対応を増やす
+ - free command topic が対応しているコマンドを増やす
+   - 特にユーザ定義のアドレスをreadするようなコマンドを追加したい
  - free state topic として，ユーザー定義のアドレスの値を監視できるようにする
-     
+ - command の設定値を sub callback でストアしてからメインループで write しているので，最大 1/roop_late [sec] の遅延が生じうる．
+   - 現在の方法：sub callback でストアしメインループで write
+     - [＋] 各IDへの command が別の topic に乗ってきても，node 側で 1/roop_late [sec] 分の command をまとめてくれる -> write回数が抑えられる．
+     - [＋] write の周期が一定になり，read の圧迫や負荷の変動が起きづらい
+     - [－] 一度 command をストアするので，topic の sub から 最大 1/roop_late [sec] の遅延が生じてしまう．
+   - もう一つの方法：sub callback で直接 write
+     - 上記の逆     
 ## how to install
 
 ```
