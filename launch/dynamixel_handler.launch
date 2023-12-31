@@ -11,7 +11,8 @@
     ${function}  main
     ${node}  /talker 
     -->
-    <env name="ROSCONSOLE_FORMAT" value="[${time}] ${function}: ${message}"/>
+    <!-- <env name="ROSCONSOLE_FORMAT" value="[${time}] ${function}: ${message}"/> -->
+    <env name="ROSCONSOLE_FORMAT" value="${function}: ${message}"/>
     
     <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
     <arg name="BAUDRATE" default="1000000"/>
@@ -66,12 +67,12 @@
         <!-- デバック用 -->
         <param name="varbose_mainloop"     value="100"/>
         <param name="varbose_callback"     value="false"/>
-        <param name="varbose_write_cmd"    value="true"/>
+        <param name="varbose_write_cmd"    value="false"/>
         <param name="varbose_write_cfg"    value="false"/>
         <param name="varbose_read_st"      value="false"/>
-        <param name="varbose_read_st_err"  value="false"/>
+        <param name="varbose_read_st_err"  value="true"/>
         <param name="varbose_read_hwerr"   value="true"/>
-        <param name="varbose_read_cfg"     value="true"/>
+        <param name="varbose_read_cfg"     value="false"/>
         <param name="varbose_read_cfg_err" value="true"/>
     </node>
 
