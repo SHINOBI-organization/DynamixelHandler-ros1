@@ -446,7 +446,7 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
 }
 
 void DynamixelHandler::CallBackDxlConfig_Gain(const dynamixel_handler::DynamixelConfig_Gain& msg) {
-    if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Gain");
+    // if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Gain");
     bool is_any = false;
     if (msg.id_list.size() == msg.velocity_i_gain__pulse.size()){ is_any=true;}
     if (msg.id_list.size() == msg.velocity_p_gain__pulse.size()){ is_any=true;}
@@ -456,13 +456,13 @@ void DynamixelHandler::CallBackDxlConfig_Gain(const dynamixel_handler::Dynamixel
     if (msg.id_list.size() == msg.feedforward_acc_gain__pulse.size()){ is_any=true;}
     if (msg.id_list.size() == msg.feedforward_vel_gain__pulse.size()){ is_any=true;}
     if (varbose_callback_) {
-         if (is_any) ROS_INFO(" - %d servo(s) gain are updated", (int)msg.id_list.size());
-         else                  ROS_ERROR(" - Element size dismatch");
+        //  if (is_any) ROS_INFO(" - %d servo(s) gain are updated", (int)msg.id_list.size());
+        //  else                  ROS_ERROR(" - Element size dismatch");
     }
 }
 
 void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::DynamixelConfig_Limit& msg) {
-    if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Limit");
+    // if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Limit");
     bool is_any = false;
 
     if (msg.id_list.size() == msg.homing_offset__deg.size()        ){is_any=true;}
@@ -470,7 +470,7 @@ void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::Dynamixe
     if (msg.id_list.size() == msg.temperature_limit__degC.size()   ){is_any=true;}
     if (msg.id_list.size() == msg.max_voltage_limit__V.size()      ){is_any=true;}
     if (msg.id_list.size() == msg.min_voltage_limit__V.size()      ){is_any=true;}
-    if (msg.id_list.size() == msg.pwm_limit__degree.size()         ){is_any=true;}
+    if (msg.id_list.size() == msg.pwm_limit__percent.size()        ){is_any=true;}
     if (msg.id_list.size() == msg.current_limit__mA.size()         ){is_any=true;}
     if (msg.id_list.size() == msg.acceleration_limit__deg_ss.size()){is_any=true;}
     if (msg.id_list.size() == msg.velocity_limit__deg_s.size()     ){is_any=true;}
@@ -478,8 +478,8 @@ void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::Dynamixe
     if (msg.id_list.size() == msg.min_position_limit__deg.size()   ){is_any=true;}
 
     if (varbose_callback_) {
-         if (is_any) ROS_INFO(" - %d servo(s) limit are updated", (int)msg.id_list.size());
-         else                  ROS_ERROR(" - Element size dismatch");
+        //  if (is_any) ROS_INFO(" - %d servo(s) limit are updated", (int)msg.id_list.size());
+        //  else                  ROS_ERROR(" - Element size dismatch");
     }
 }
 
@@ -497,6 +497,7 @@ void DynamixelHandler::BroadcastDxlState(){
     for (auto id : id_list_) {
         msg.id_list.push_back(id);
         for (auto state : list_read_state_) switch(state) {
+            case PRESENT_PWM:          msg.pwm__percent.push_back         (state_values_[id][PRESENT_PWM          ]    ); break;
             case PRESENT_CURRENT:      msg.current__mA.push_back          (state_values_[id][PRESENT_CURRENT      ]    ); break;
             case PRESENT_VELOCITY:     msg.velocity__deg_s.push_back      (state_values_[id][PRESENT_VELOCITY     ]/DEG); break;
             case PRESENT_POSITION:     msg.position__deg.push_back        (state_values_[id][PRESENT_POSITION     ]/DEG); break;

@@ -115,14 +115,14 @@ bool DynamixelHandler::Initialize(){
 
     //  readする情報の設定
     bool read_pwm, read_cur, read_vel, read_pos, read_vel_traj, read_pos_traj, read_volt, read_temp;
-    if (!nh_p.getParam("read_present_pwm",         read_pwm))      read_pwm = false;
-    if (!nh_p.getParam("read_present_current",     read_cur))      read_cur = true;
-    if (!nh_p.getParam("read_present_velocity",    read_vel))      read_vel = true;
-    if (!nh_p.getParam("read_present_position",    read_pos))      read_pos = true;
-    if (!nh_p.getParam("read_velocity_trajectory", read_vel_traj)) read_vel_traj = false;
-    if (!nh_p.getParam("read_position_trajectory", read_pos_traj)) read_pos_traj = false;
-    if (!nh_p.getParam("read_input_voltage",       read_volt))     read_volt = false;
-    if (!nh_p.getParam("read_present_temperature", read_temp))     read_temp = false;
+    if (!nh_p.getParam("read_present_pwm",          read_pwm))      read_pwm = false;
+    if (!nh_p.getParam("read_present_current",      read_cur))      read_cur = true;
+    if (!nh_p.getParam("read_present_velocity",     read_vel))      read_vel = true;
+    if (!nh_p.getParam("read_present_position",     read_pos))      read_pos = true;
+    if (!nh_p.getParam("read_velocity_trajectory",  read_vel_traj)) read_vel_traj = false;
+    if (!nh_p.getParam("read_position_trajectory",  read_pos_traj)) read_pos_traj = false;
+    if (!nh_p.getParam("read_present_input_voltage",read_volt))     read_volt = false;
+    if (!nh_p.getParam("read_present_temperature",  read_temp))     read_temp = false;
     list_read_state_.clear();
     if ( read_pwm ) list_read_state_.insert(PRESENT_PWM);
     if ( read_cur ) list_read_state_.insert(PRESENT_CURRENT);

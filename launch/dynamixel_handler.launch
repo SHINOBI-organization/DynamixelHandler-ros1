@@ -43,15 +43,15 @@
         <!-- 通信の設定 -->
         <param name="device_name" value="$(arg DEVICE_NAME)"/>
         <param name="baudrate" value="$(arg BAUDRATE)"/>
-        <param name="dyn_comm_retry_num"      value="3"/>
-        <param name="dyn_comm_inerval_msec"   value="5"/>
-        <param name="dyn_comm_varbose"        value="false"/>
+        <param name="dyn_comm_retry_num"      value="3"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
+        <param name="dyn_comm_inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
+        <param name="dyn_comm_varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
 
         <!-- サーボの初期設定 -->
-        <param name="init_auto_search_max_id"        value="45"/>   <!-- 初期化時に行うサーボ自動検索の最大ID -->
-        <param name="init_expected_servo_num"        value="0"/>    <!-- 初期化時に自動検索するサーボの期待個数，　0ならいくつでもok -->
+        <param name="init_auto_search_max_id"        value="45"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
+        <param name="init_expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
         <param name="init_hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
-        <param name="init_torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動で有効にするかどうか -->
+        <param name="init_torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
 
         <!-- ループの設定 -->
         <param name="loop_rate" value="250"/>
@@ -59,10 +59,20 @@
         <param name="ratio_config_read" value="0"/>    <!-- この回数に一回 Config を読み取る, 0=初回のみ -->
         <param name="ratio_error_read"  value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
         
-        <!-- Read方式 -->
+        <!-- Read/Write方式 -->
         <param name="use_fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
         <param name="use_slipt_read" value="false"/> <!-- 複数のアドレスからの読み込みを分割するか同時に行うか, trueだと遅い -->
-        <param name="use_slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでも速度的に変わらない -->
+        <param name="use_slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでもそんなに遅くならない -->
+
+        <!-- Readする情報 -->
+        <param name="read_present_pwm"           value="false"/>
+        <param name="read_present_current"       value="true"/>
+        <param name="read_present_velocity"      value="true"/>
+        <param name="read_present_position"      value="true"/>
+        <param name="read_velocity_trajectory"   value="false"/>
+        <param name="read_position_trajectory"   value="false"/>
+        <param name="read_present_input_voltage" value="false"/>
+        <param name="read_present_temperature"   value="false"/>
         
         <!-- デバック用 -->
         <param name="varbose_mainloop"     value="100"/>
