@@ -155,9 +155,9 @@ paramの章を参照
  - /dynamixel/cmd/x/extended_position
  - /dynamixel/cmd/x/current_position 
  - /dynamixel/cmd/profile : 未実装
- - /dynamixel/config/gain/w : 未実装
- - /dynamixel/config/limit/w : 未実装
- - /dynamixel/config/mode/w : 未実装
+ - /dynamixel/option/gain/w : 未実装
+ - /dynamixel/option/limit/w : 未実装
+ - /dynamixel/option/mode/w : 未実装
  
 #### Published from dyanmixel_handler　
 
@@ -166,9 +166,9 @@ paramの章を参照
  - /dynamixel/state_free : 未実装
  - /dynamixel/state
  - /dynamixel/error
- - /dynamixel/config/gain/r : 未実装
- - /dynamixel/config/limit/r : 未実装
- - /dynamixel/config/mode/r : 未実装
+ - /dynamixel/option/gain/r : 未実装
+ - /dynamixel/option/limit/r : 未実装
+ - /dynamixel/option/mode/r : 未実装
 
 ## param
 
@@ -176,47 +176,48 @@ paramの章を参照
 <!-- 通信の設定 -->
 <param name="device_name" value="$(arg DEVICE_NAME)"/>
 <param name="baudrate" value="$(arg BAUDRATE)"/>
-<param name="dyn_comm_retry_num"      value="3"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
-<param name="dyn_comm_inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
-<param name="dyn_comm_varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
+<param name="dyn_comm/retry_num"      value="3"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
+<param name="dyn_comm/inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
+<param name="dyn_comm/varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
 
 <!-- サーボの初期設定 -->
-<param name="init_auto_search_max_id"        value="45"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
-<param name="init_expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
-<param name="init_hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
-<param name="init_torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
+<param name="init/auto_search_max_id"        value="45"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
+<param name="init/expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
+<param name="init/hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
+<param name="init/torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
 
 <!-- ループの設定 -->
 <param name="loop_rate" value="250"/>
-<param name="ratio_state_read"  value="2"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
-<param name="ratio_config_read" value="0"/>    <!-- この回数に一回 Config を読み取る, 0=初回のみ -->
-<param name="ratio_error_read"  value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
-        
+<param name="ratio/state_read"   value="1"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
+<param name="ratio/option_read"  value="0"/>    <!-- この回数に一回 option を読み取る, 0=初回のみ -->
+<param name="ratio/error_read"   value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
+<param name="ratio/varbose_loop" value="100"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
+
 <!-- Read/Write方式 -->
-<param name="use_fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
-<param name="use_slipt_read" value="false"/> <!-- 複数のアドレスからの読み込みを分割するか同時に行うか, trueだと遅い -->
-<param name="use_slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでもそんなに遅くならない -->
+<param name="use/fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
+<param name="use/slipt_read" value="false"/> <!-- 複数のアドレスからの読み込みを分割するか同時に行うか, trueだと遅い -->
+<param name="use/slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでもそんなに遅くならない -->
 
 <!-- Readする情報 -->
-<param name="read_present_pwm"           value="false"/>
-<param name="read_present_current"       value="true"/>
-<param name="read_present_velocity"      value="true"/>
-<param name="read_present_position"      value="true"/>
-<param name="read_velocity_trajectory"   value="false"/>
-<param name="read_position_trajectory"   value="false"/>
-<param name="read_present_input_voltage" value="false"/>
-<param name="read_present_temperature"   value="false"/>
-        
+<param name="read/present_pwm"           value="false"/>
+<param name="read/present_current"       value="true"/>
+<param name="read/present_velocity"      value="true"/>
+<param name="read/present_position"      value="true"/>
+<param name="read/velocity_trajectory"   value="false"/>
+<param name="read/position_trajectory"   value="false"/>
+<param name="read/present_input_voltage" value="false"/>
+<param name="read/present_temperature"   value="false"/>
+
 <!-- デバック用 -->
-<param name="varbose_mainloop"     value="100"/>
-<param name="varbose_callback"     value="false"/>
-<param name="varbose_write_cmd"    value="false"/>
-<param name="varbose_write_cfg"    value="false"/>
-<param name="varbose_read_st"      value="false"/>
-<param name="varbose_read_st_err"  value="true"/>
-<param name="varbose_read_hwerr"   value="true"/>
-<param name="varbose_read_cfg"     value="false"/>
-<param name="varbose_read_cfg_err" value="true"/>
+<param name="max_log_width"        value="8"/>     <!-- 以下のlog出力で，サーボ何個ごとに改行を入れるか -->
+<param name="varbose/callback"     value="false"/> <!-- コールバック関数の呼び出しを出力 -->
+<param name="varbose/write_commad"    value="false"/> <!-- 書き込みするcommandデータのpulse値を出力 -->
+<param name="varbose/write_option"    value="false"/> <!-- 書き込みするoptionデータのpulse値を出力 -->
+<param name="varbose/read_state/raw"  value="false"/> <!-- 読み込んだstateデータのpulse値を出力 -->
+<param name="varbose/read_state/err"  value="false"/>  <!-- stateデータの読み込みエラーを出力 -->
+<param name="varbose/read_option/raw" value="false"/> <!-- 読み込んだoptionデータのpulse値を出力 -->
+<param name="varbose/read_option/err" value="true"/>  <!-- optionデータの読み込みエラーを出力 -->
+<param name="varbose/read_hardware_error"   value="true"/>  <!-- 検出したHardware errorを出力 -->
 ```
 
 ## 初期設定と注意事項
@@ -258,75 +259,74 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 
 ## Control Table との対応
 
-### 温度
- - temperature_limit  : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - present_temperture : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
-
-### 電圧
- - max_voltage_limit     : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - min_voltage_limit     : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - present_input_voltage : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
-
-### PWM
- - pwm_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
+### コマンド (goal values)
  - goal_pwm    : 未実装，`/dynamixel/cmd/x/pwm`をsubすると設定されるようにしたい
- - present_pwm : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
-
-### 電流
- - current_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
  - goal_current    : `/dynamixel/cmd/x/current` or `/dynamixel/cmd/x/current_position`をsubすると設定され，loop_rateの周期で書き込まれる．
- - present_current : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
-
-### 加速度
- - acceleration_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - profile_acceleration : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
-
-### 速度
- - velocity_limit      : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - profile_velocity    : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
  - goal_velocity       : `/dynamixel/cmd/x/velocity`をsubすると設定され，loop_rateの周期で書き込まれる．
- - present_velocity    : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - velocity_trajectory : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
-
-### 位置
- - max_position_limit    : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - min_position_limit    : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
  - goal_position         : `/dynamixel/cmd/x/position` or `/dynamixel/cmd/x/current_position` or `/dynamixel/cmd/x/extended_position` をsubすると設定され．loop_rateの周期で書き込まれる．
- - present_position      : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - position_trajectory   : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
 
-### PIDパラメータ
- - velocity_i_gain       : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
- - velocity_p_gain       : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/gain/r`としてpubできるにようにする．
- - position_d_gain       : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．
- - position_i_gain       : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/gain/r`としてpubできるにようにする．
- - position_p_gain       : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/gain/r`としてpubできるにようにする．
- - feedforward_acc_gain  : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/gain/r`としてpubできるにようにする．
- - feedforward_vel_gain  : 未実装，`/dynamixel/config/gain/w`のsubで設定し，現在値を`/dynamixel/config/gain/r`としてpubできるにようにする．
+### 状態 (present values)
+ - present_pwm : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
+ - present_current : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - present_velocity    : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - present_position      : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - velocity_trajectory : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - position_trajectory   : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
+ - present_input_voltage : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
+ - present_temperture : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
+  
+### Profile 
+ - profile_acceleration : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
+ - profile_velocity    : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
+
+### 制限 
+ - temperature_limit  : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - max_voltage_limit     : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - min_voltage_limit     : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - pwm_limit   : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - current_limit   : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - acceleration_limit   : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - velocity_limit      : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - max_position_limit    : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - min_position_limit    : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+
+### ゲイン
+ - velocity_i_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - velocity_p_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - position_d_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - position_i_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - position_p_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - feedforward_acc_gain  : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - feedforward_vel_gain  : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
    
 ### External Ports
  - external_port_mode_{x} : 未実装，topicから制御できるようにする．
  - external_port_data_{x} : 未実装，topicから制御できるようにする．
 
-### 機能系
- - hardware_error_status  : `/dynamixel/error`としてloop_rate/ratio_read_errorの周期でpubされる. 
- - torque_enable          : 接続時に自動でトルクONされる. `/dynamixel/cmd_free`の`command='eneble'`でON,`command='disable'`でOFFに設定される．  
-                            未実装，現在値を`/dynamixel/config/gain/r`としてpubされるようにする．   
-                            未実装，`/dynamixel/config/mode/w`をsubして設定されるようにする．
+### モード
  - operating_mode         : 対応するtopicのsubで自動で設定される．  
-                            未実装，現在値を`/dynamixel/config/mode/r`としてpubされるようにする．   
-                            未実装，`/dynamixel/config/mode/w`をsubして設定されるようにする．
- - drive_mode             : 未実装，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．    
-                            未実装，`/dynamixel/config/mode/w`をsubして設定されるようにする．
+                            未実装，現在値を`/dynamixel/option/mode/r`としてpubされるようにする．   
+                            未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
+ - drive_mode             : 未実装，現在値を`/dynamixel/option/mode/r`としてpubできるにようにする．    
+                            未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
+ - torque_enable          : 接続時に自動でトルクONされる. `/dynamixel/cmd_free`の`command='eneble'`でON,`command='disable'`でOFFに設定される．  
+                            未実装，現在値を`/dynamixel/option/gain/r`としてpubされるようにする．   
+                            未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
+
+### エラー
+ - hardware_error_status  : `/dynamixel/error`としてloop_rate/ratio_read_errorの周期でpubされる. 
+
+### 設定
+ - return_delay_time      : not support
  - homing_offset          : ユーザーは使用不可，reboot時の角度補正に用いられる．
+ - moving_threshold       : not support
+ - shutdown               : not support
+ - status_return_level    : not support, 常に2を前提とする
  - bus_watchbdog          : 未実装，current/velocity control時に一定時間通信切れで自動停止するようにする．
 
 ### その他
- - moving_threshold       : not support
- - realtime_tick          : not support
+ - led                    : not support
  - registered_instruction : not support
- - shutdown               : not support
+ - realtime_tick          : not support
  - moving                 : not support
  - moving_status          : not support
- - led                    : not support
- - status_return_level    : not support, 常に2を前提とする

@@ -9,9 +9,11 @@ using ros::Time;
 #include <dynamixel_handler/DynamixelState.h>
 #include <dynamixel_handler/DynamixelStateFree.h>
 #include <dynamixel_handler/DynamixelError.h>
-#include <dynamixel_handler/DynamixelConfig_Limit.h>
-#include <dynamixel_handler/DynamixelConfig_Gain.h>
-#include <dynamixel_handler/DynamixelConfig_Mode.h>
+#include <dynamixel_handler/DynamixelOption_Config.h>
+#include <dynamixel_handler/DynamixelOption_Extra.h>
+#include <dynamixel_handler/DynamixelOption_Gain.h>
+#include <dynamixel_handler/DynamixelOption_Limit.h>
+#include <dynamixel_handler/DynamixelOption_Mode.h>
 #include <dynamixel_handler/DynamixelCommandFree.h>
 #include <dynamixel_handler/DynamixelCommand_Profile.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlPosition.h>
@@ -65,14 +67,14 @@ class DynamixelHandler {
         static void BroadcastDxlState();
         static void BroadcastDxlStateFree(); // todo 
         static void BroadcastDxlError();
-        static void BroadcastDxlConfig_Limit(); // todo
-        static void BroadcastDxlConfig_Gain();  // todo
-        static void BroadcastDxlConfig_Mode();  // todo
-        static void CallBackDxlConfig_Limit (const dynamixel_handler::DynamixelConfig_Limit& msg); // todo
-        static void CallBackDxlConfig_Gain  (const dynamixel_handler::DynamixelConfig_Gain& msg);  // todo
-        static void CallBackDxlConfig_Mode  (const dynamixel_handler::DynamixelConfig_Mode& msg);  // todo
-        static void CallBackDxlCommandFree    (const dynamixel_handler::DynamixelCommandFree& msg);    // todo
-        static void CallBackDxlCommand_Profile (const dynamixel_handler::DynamixelCommand_Profile& msg); // todo
+        static void BroadcastDxlOption_Limit(); // todo
+        static void BroadcastDxlOption_Gain();  // todo
+        static void BroadcastDxlOption_Mode();  // todo
+        static void CallBackDxlOption_Limit (const dynamixel_handler::DynamixelOption_Limit& msg); // todo
+        static void CallBackDxlOption_Gain  (const dynamixel_handler::DynamixelOption_Gain& msg);  // todo
+        static void CallBackDxlOption_Mode  (const dynamixel_handler::DynamixelOption_Mode& msg);  // todo
+        static void CallBackDxlCommandFree               (const dynamixel_handler::DynamixelCommandFree& msg);    // todo
+        static void CallBackDxlCommand_Profile           (const dynamixel_handler::DynamixelCommand_Profile& msg); // todo
         static void CallBackDxlCommand_X_Position        (const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg);
         static void CallBackDxlCommand_X_Velocity        (const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg);
         static void CallBackDxlCommand_X_Current         (const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg);
@@ -80,11 +82,11 @@ class DynamixelHandler {
         static void CallBackDxlCommand_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg);
         //* ROS publisher subscriber instance
         static inline ros::Publisher  pub_state_;
-        static inline ros::Publisher  pub_state_free_;
+        static inline ros::Publisher  pub_st_free_;
         static inline ros::Publisher  pub_error_;
-        static inline ros::Publisher  pub_config_limit_;
-        static inline ros::Publisher  pub_config_gain_;
-        static inline ros::Publisher  pub_config_mode_;
+        static inline ros::Publisher  pub_opt_limit_;
+        static inline ros::Publisher  pub_opt_gain_;
+        static inline ros::Publisher  pub_opt_mode_;
         static inline ros::Subscriber sub_cmd_free_;
         static inline ros::Subscriber sub_cmd_profile_;
         static inline ros::Subscriber sub_cmd_x_pos_;
@@ -92,9 +94,9 @@ class DynamixelHandler {
         static inline ros::Subscriber sub_cmd_x_cur_;
         static inline ros::Subscriber sub_cmd_x_cpos_;
         static inline ros::Subscriber sub_cmd_x_epos_;
-        static inline ros::Subscriber sub_config_limit_;
-        static inline ros::Subscriber sub_config_gain_;
-        static inline ros::Subscriber sub_config_mode_;
+        static inline ros::Subscriber sub_opt_limit_;
+        static inline ros::Subscriber sub_opt_gain_;
+        static inline ros::Subscriber sub_opt_mode_;
 
     private:
         DynamixelHandler() = delete;
@@ -121,7 +123,7 @@ class DynamixelHandler {
         //* 各種のフラグとパラメータ
         static inline int  loop_rate_    = 50;
         static inline int  ratio_state_pub_  = 1; 
-        static inline int  ratio_config_pub_ = 100; // 0の時は初回のみ
+        static inline int  ratio_option_pub_ = 100; // 0の時は初回のみ
         static inline int  ratio_error_pub_  = 100;
         static inline int  ratio_mainloop_  = 100;
         static inline int  width_log_ = 7;
@@ -130,12 +132,12 @@ class DynamixelHandler {
         static inline bool use_fast_read_   = false;
         static inline bool varbose_callback_  = false;
         static inline bool varbose_write_cmd_ = false;
-        static inline bool varbose_write_cfg_ = false;
+        static inline bool varbose_write_opt_ = false;
         static inline bool varbose_read_st_      = false;
         static inline bool varbose_read_st_err_  = false;
         static inline bool varbose_read_hwerr_   = false;
-        static inline bool varbose_read_cfg_     = false;
-        static inline bool varbose_read_cfg_err_ = false;
+        static inline bool varbose_read_opt_     = false;
+        static inline bool varbose_read_opt_err_ = false;
 
         //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
@@ -167,7 +169,7 @@ class DynamixelHandler {
             ELECTRONICAL_SHOCK = 4,
             OVERLOAD           = 5,
         };
-        enum CfgParamIndex_Limit { // config_param_のIndex, サーボのCmd_valueの制限値
+        enum OptLimitIndex { // opt_limit_のIndex, 各種の制限値
             TEMPERATURE_LIMIT  = 0,
             MAX_VOLTAGE_LIMIT  = 1,
             MIN_VOLTAGE_LIMIT  = 2,
@@ -187,7 +189,7 @@ class DynamixelHandler {
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身の並びはCmdValueIndexに対応する
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身の並びはStValueIndexに対応する
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身の並びはHWErrIndexに対応する
-        static inline map<uint8_t, array<double,11>> cfg_param_limit_; // 各dynamixelの id と サーボの各種制限値のマップ, 中身の並びはCfgParamIndex_Limitに対応する 
+        static inline map<uint8_t, array<double, 9>> option_limit_; // 各dynamixelの id と サーボの各種制限値のマップ, 中身の並びはOptLimitIndexに対応する 
         // 上記の変数を適切に使うための補助的なフラグ
         static inline map<uint8_t, Time> when_op_mode_updated_; // 各dynamixelの id と op_mode_ が更新された時刻のマップ
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
@@ -198,17 +200,17 @@ class DynamixelHandler {
         static inline set<CmdValueIndex> list_wirte_cmd_  = {};
         static inline set<StValueIndex>  list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
-        static void SyncWriteCmdValues(CmdValueIndex target);
-        static void SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_cmd=list_wirte_cmd_);
-        static void SyncWriteCfgParams_Mode();  // todo 
-        static void SyncWriteCfgParams_Gain();  // todo 
-        static void SyncWriteCfgParams_Limit(); // todo 
+        static void SyncWriteCommandValues(CmdValueIndex target);
+        static void SyncWriteCommandValues(const set<CmdValueIndex>& list_wirte_cmd=list_wirte_cmd_);
+        static void SyncWriteOption_Mode();  // todo 
+        static void SyncWriteOption_Gain();  // todo 
+        static void SyncWriteOption_Limit(); // todo 
         static bool SyncReadStateValues(StValueIndex target);
         static bool SyncReadStateValues(const set<StValueIndex>& list_read_state=list_read_state_);
         static bool SyncReadHardwareErrors();
-        static bool SyncReadCfgParams_Mode();  // todo
-        static bool SyncReadCfgParams_Gain();  // todo
-        static bool SyncReadCfgParams_Limit(); // todo
+        static bool SyncReadOption_Mode();  // todo
+        static bool SyncReadOption_Gain();  // todo
+        static bool SyncReadOption_Limit(); // todo
 };
 
 namespace dyn_x{
@@ -230,7 +232,7 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_input_voltage, 
         present_temperture    
     }; 
-const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が大事，CfgParamIndex_Limitと対応
+const static vector<DynamixelAddress> opt_limit_dp_list = { // この順序が大事，OptLimitIndexと対応
         temperature_limit ,
         max_voltage_limit ,
         min_voltage_limit ,
@@ -262,7 +264,7 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_input_voltage, 
         present_temperture    
     }; 
-const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が大事
+const static vector<DynamixelAddress> opt_limit_dp_list = { // この順序が大事
         temperature_limit ,
         max_voltage_limit ,
         min_voltage_limit ,

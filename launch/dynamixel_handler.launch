@@ -33,58 +33,58 @@
         <remap from="/dynamixel/state" to="/dynamixel/state"/>
         <remap from="/dynamixel/error" to="/dynamixel/error"/>
         <!-- 読み書き両方 -->
-        <remap from="/dynamixel/config/limit/r" to="/dynamixel/config/limit/r"/>
-        <remap from="/dynamixel/config/gain/r"  to="/dynamixel/config/gain/r" />
-        <remap from="/dynamixel/config/mode/r"  to="/dynamixel/config/mode/r" />
-        <remap from="/dynamixel/config/limit/w" to="/dynamixel/config/limit/w"/>
-        <remap from="/dynamixel/config/gain/w"  to="/dynamixel/config/gain/w" />
-        <remap from="/dynamixel/config/mode/w"  to="/dynamixel/config/mode/w" />
+        <remap from="/dynamixel/option/limit/r" to="/dynamixel/option/limit/r"/>
+        <remap from="/dynamixel/option/gain/r"  to="/dynamixel/option/gain/r" />
+        <remap from="/dynamixel/option/mode/r"  to="/dynamixel/option/mode/r" />
+        <remap from="/dynamixel/option/limit/w" to="/dynamixel/option/limit/w"/>
+        <remap from="/dynamixel/option/gain/w"  to="/dynamixel/option/gain/w" />
+        <remap from="/dynamixel/option/mode/w"  to="/dynamixel/option/mode/w" />
 
         <!-- 通信の設定 -->
         <param name="device_name" value="$(arg DEVICE_NAME)"/>
         <param name="baudrate" value="$(arg BAUDRATE)"/>
-        <param name="dyn_comm_retry_num"      value="3"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
-        <param name="dyn_comm_inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
-        <param name="dyn_comm_varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
+        <param name="dyn_comm/retry_num"      value="3"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
+        <param name="dyn_comm/inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
+        <param name="dyn_comm/varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
 
         <!-- サーボの初期設定 -->
-        <param name="init_auto_search_max_id"        value="45"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
-        <param name="init_expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
-        <param name="init_hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
-        <param name="init_torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
+        <param name="init/auto_search_max_id"        value="45"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
+        <param name="init/expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
+        <param name="init/hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
+        <param name="init/torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
 
         <!-- ループの設定 -->
         <param name="loop_rate" value="250"/>
-        <param name="ratio_state_read"  value="2"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
-        <param name="ratio_config_read" value="0"/>    <!-- この回数に一回 Config を読み取る, 0=初回のみ -->
-        <param name="ratio_error_read"  value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
+        <param name="ratio/state_read"   value="1"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
+        <param name="ratio/option_read"  value="0"/>    <!-- この回数に一回 option を読み取る, 0=初回のみ -->
+        <param name="ratio/error_read"   value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
+        <param name="ratio/varbose_loop" value="100"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
         
         <!-- Read/Write方式 -->
-        <param name="use_fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
-        <param name="use_slipt_read" value="false"/> <!-- 複数のアドレスからの読み込みを分割するか同時に行うか, trueだと遅い -->
-        <param name="use_slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでもそんなに遅くならない -->
+        <param name="use/fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
+        <param name="use/slipt_read" value="false"/> <!-- 複数のアドレスからの読み込みを分割するか同時に行うか, trueだと遅い -->
+        <param name="use/slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでもそんなに遅くならない -->
 
         <!-- Readする情報 -->
-        <param name="read_present_pwm"           value="false"/>
-        <param name="read_present_current"       value="true"/>
-        <param name="read_present_velocity"      value="true"/>
-        <param name="read_present_position"      value="true"/>
-        <param name="read_velocity_trajectory"   value="false"/>
-        <param name="read_position_trajectory"   value="false"/>
-        <param name="read_present_input_voltage" value="false"/>
-        <param name="read_present_temperature"   value="false"/>
+        <param name="read/present_pwm"           value="false"/>
+        <param name="read/present_current"       value="true"/>
+        <param name="read/present_velocity"      value="true"/>
+        <param name="read/present_position"      value="true"/>
+        <param name="read/velocity_trajectory"   value="false"/>
+        <param name="read/position_trajectory"   value="false"/>
+        <param name="read/present_input_voltage" value="false"/>
+        <param name="read/present_temperature"   value="false"/>
         
         <!-- デバック用 -->
-        <param name="ratio_varbose_loop"   value="100"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
         <param name="max_log_width"        value="8"/>     <!-- 以下のlog出力で，サーボ何個ごとに改行を入れるか -->
-        <param name="varbose_callback"     value="false"/> <!-- コールバック関数の呼び出しを出力 -->
-        <param name="varbose_write_cmd"    value="false"/> <!-- 書き込みするcommandデータのpulse値を出力 -->
-        <param name="varbose_write_cfg"    value="false"/> <!-- 書き込みするconfigデータのpulse値を出力 -->
-        <param name="varbose_read_st"      value="false"/> <!-- 読み込んだstateデータのpulse値を出力 -->
-        <param name="varbose_read_st_err"  value="true"/>  <!-- stateデータの読み込みエラーを出力 -->
-        <param name="varbose_read_hwerr"   value="true"/>  <!-- 検出したHardware errorを出力 -->
-        <param name="varbose_read_cfg"     value="false"/> <!-- 読み込んだconfigデータのpulse値を出力 -->
-        <param name="varbose_read_cfg_err" value="true"/>  <!-- configデータの読み込みエラーを出力 -->
+        <param name="varbose/callback"     value="false"/> <!-- コールバック関数の呼び出しを出力 -->
+        <param name="varbose/write_commad"    value="false"/> <!-- 書き込みするcommandデータのpulse値を出力 -->
+        <param name="varbose/write_option"    value="false"/> <!-- 書き込みするoptionデータのpulse値を出力 -->
+        <param name="varbose/read_state/raw"  value="false"/> <!-- 読み込んだstateデータのpulse値を出力 -->
+        <param name="varbose/read_state/err"  value="false"/>  <!-- stateデータの読み込みエラーを出力 -->
+        <param name="varbose/read_option/raw" value="false"/> <!-- 読み込んだoptionデータのpulse値を出力 -->
+        <param name="varbose/read_option/err" value="true"/>  <!-- optionデータの読み込みエラーを出力 -->
+        <param name="varbose/read_hardware_error"   value="true"/>  <!-- 検出したHardware errorを出力 -->
     </node>
 
 </launch>

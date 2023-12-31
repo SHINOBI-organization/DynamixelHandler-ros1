@@ -95,7 +95,7 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
 // モータの動作を停止させる．
 bool DynamixelHandler::StopRotation(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    auto cur_lim = cfg_param_limit_[id][CURRENT_LIMIT];
+    auto cur_lim = option_limit_[id][CURRENT_LIMIT];
     auto now_pos = ReadPresentPosition(id);
     cmd_values_[id][GOAL_POSITION]      = now_pos;
     state_values_[id][PRESENT_POSITION] = now_pos;
@@ -160,12 +160,12 @@ bool DynamixelHandler::WriteOperatingMode(uint8_t id, uint8_t mode){
 //* Main loop 内で使う全モータへの一括読み書き関数たち
 
 /**
- * @func SyncWriteCmdValues
+ * @func SyncWriteCommandValues
  * @brief 指定した範囲のコマンド値を書き込む
  * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
 */
-void DynamixelHandler::SyncWriteCmdValues(CmdValueIndex target){ set<CmdValueIndex> t = {target} ; return SyncWriteCmdValues(t);} 
-void DynamixelHandler::SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_cmd){
+void DynamixelHandler::SyncWriteCommandValues(CmdValueIndex target){ set<CmdValueIndex> t = {target} ; return SyncWriteCommandValues(t);} 
+void DynamixelHandler::SyncWriteCommandValues(const set<CmdValueIndex>& list_wirte_cmd){
     if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
     const CmdValueIndex start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
     const CmdValueIndex end   = *max_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
@@ -246,15 +246,15 @@ bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_st
     return id_st_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
-void DynamixelHandler::SyncWriteCfgParams_Mode(){
+void DynamixelHandler::SyncWriteOption_Mode(){
     return;
 }
 
-void DynamixelHandler::SyncWriteCfgParams_Gain(){
+void DynamixelHandler::SyncWriteOption_Gain(){
     return;
 }
 
-void DynamixelHandler::SyncWriteCfgParams_Limit(){
+void DynamixelHandler::SyncWriteOption_Limit(){
     return;
 }
 
@@ -300,24 +300,24 @@ bool DynamixelHandler::SyncReadHardwareErrors(){
     return true;
 }
 
-bool DynamixelHandler::SyncReadCfgParams_Mode(){
+bool DynamixelHandler::SyncReadOption_Mode(){
     return false;
 }
 
-bool DynamixelHandler::SyncReadCfgParams_Gain(){
+bool DynamixelHandler::SyncReadOption_Gain(){
     return false;
 }
 
-bool DynamixelHandler::SyncReadCfgParams_Limit(){
+bool DynamixelHandler::SyncReadOption_Limit(){
     vector<uint8_t> target_id_list;
     for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
 
-    auto id_limit_vec_map = dyn_comm_.SyncRead_fast(cfg_limit_dp_list, target_id_list);   
+    auto id_limit_vec_map = dyn_comm_.SyncRead_fast(opt_limit_dp_list, target_id_list);   
     bool is_timeout_read     = dyn_comm_.timeout_last_read();
     bool has_comm_error_read = dyn_comm_.comm_error_last_read();
 
     // 通信エラーの表示
-    if ( varbose_read_cfg_err_ ) if ( has_comm_error_read || is_timeout_read ) {
+    if ( varbose_read_opt_err_ ) if ( has_comm_error_read || is_timeout_read ) {
         vector<uint8_t> failed_id_list;
         for ( auto id : target_id_list ) if ( id_limit_vec_map.find(id) == id_limit_vec_map.end() ) failed_id_list.push_back(id);
         char header[100]; sprintf(header, "[%d] servo(s) failed to read", (int)(target_id_list.size() - id_limit_vec_map.size()));
@@ -325,19 +325,19 @@ bool DynamixelHandler::SyncReadCfgParams_Limit(){
         ROS_WARN_STREAM(ss);
     }
     // id_limit_vec_mapの中身を確認
-    if ( varbose_read_cfg_ ) if ( id_limit_vec_map.size()>0 ) {
+    if ( varbose_read_opt_ ) if ( id_limit_vec_map.size()>0 ) {
         char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_limit_vec_map.size());
-        auto ss = control_table_layout(width_log_, id_limit_vec_map, cfg_limit_dp_list, string(header));
+        auto ss = control_table_layout(width_log_, id_limit_vec_map, opt_limit_dp_list, string(header));
         ROS_INFO_STREAM(ss);
     }
 
-    // cfg_param_limit_に反映
-    for ( auto cfg_lim=0; cfg_lim<cfg_limit_dp_list.size(); cfg_lim++) {
-        DynamixelAddress dp = cfg_limit_dp_list[cfg_lim];
+    // option_limit_に反映
+    for ( auto opt_lim=0; opt_lim<opt_limit_dp_list.size(); opt_lim++) {
+        DynamixelAddress dp = opt_limit_dp_list[opt_lim];
         for (auto pair : id_limit_vec_map) {
             const uint8_t id = pair.first;
-            const int64_t data_int = pair.second[cfg_lim];
-            cfg_param_limit_[id][cfg_lim] = dp.pulse2val( data_int, model_[id]);
+            const int64_t data_int = pair.second[opt_lim];
+            option_limit_[id][opt_lim] = dp.pulse2val( data_int, model_[id]);
         }
     }
 
@@ -370,7 +370,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto pos = msg.position__deg[i];
-        auto limit = cfg_param_limit_[id];
+        auto limit = option_limit_[id];
         cmd_values_[id][GOAL_POSITION] = clamp(deg2rad(pos), limit[MIN_POSITION_LIMIT], limit[MAX_POSITION_LIMIT]);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
@@ -386,7 +386,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::Dy
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto vel = msg.velocity__deg_s[i];
-        auto limit = cfg_param_limit_[id];
+        auto limit = option_limit_[id];
         cmd_values_[id][GOAL_VELOCITY] = clamp(deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT]);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_VELOCITY);
@@ -402,7 +402,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::Dyn
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto cur = msg.current__mA[i];
-        auto limit = cfg_param_limit_[id];
+        auto limit = option_limit_[id];
         cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
@@ -419,7 +419,7 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
-        auto limit = cfg_param_limit_[id];
+        auto limit = option_limit_[id];
         if ( do_process_pos ){
             auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
             auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
@@ -456,8 +456,8 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
     if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }
 
-void DynamixelHandler::CallBackDxlConfig_Gain(const dynamixel_handler::DynamixelConfig_Gain& msg) {
-    // if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Gain");
+void DynamixelHandler::CallBackDxlOption_Gain(const dynamixel_handler::DynamixelOption_Gain& msg) {
+    // if (varbose_callback_) ROS_INFO("CallBackDxlOption_Gain");
     bool is_any = false;
     if (msg.id_list.size() == msg.velocity_i_gain__pulse.size()){ is_any=true;}
     if (msg.id_list.size() == msg.velocity_p_gain__pulse.size()){ is_any=true;}
@@ -472,8 +472,8 @@ void DynamixelHandler::CallBackDxlConfig_Gain(const dynamixel_handler::Dynamixel
     }
 }
 
-void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::DynamixelConfig_Limit& msg) {
-    // if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Limit");
+void DynamixelHandler::CallBackDxlOption_Limit(const dynamixel_handler::DynamixelOption_Limit& msg) {
+    // if (varbose_callback_) ROS_INFO("CallBackDxlOption_Limit");
     bool is_any = false;
 
     if (msg.id_list.size() == msg.temperature_limit__degC.size()   ){is_any=true;}
@@ -492,7 +492,7 @@ void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::Dynamixe
     }
 }
 
-void DynamixelHandler::CallBackDxlConfig_Mode(const dynamixel_handler::DynamixelConfig_Mode& msg) {
+void DynamixelHandler::CallBackDxlOption_Mode(const dynamixel_handler::DynamixelOption_Mode& msg) {
  
 }
 
@@ -533,12 +533,12 @@ void DynamixelHandler::BroadcastDxlError(){
     pub_error_.publish(msg);
 }
 
-void DynamixelHandler::BroadcastDxlConfig_Limit(){
+void DynamixelHandler::BroadcastDxlOption_Limit(){
 
 }
-void DynamixelHandler::BroadcastDxlConfig_Gain(){
+void DynamixelHandler::BroadcastDxlOption_Gain(){
 
 }
-void DynamixelHandler::BroadcastDxlConfig_Mode(){
+void DynamixelHandler::BroadcastDxlOption_Mode(){
 
 }

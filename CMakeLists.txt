@@ -53,17 +53,20 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   
-  DynamixelStateFree.msg
+  # read専用
   DynamixelCommandFree.msg
-
   DynamixelState.msg
-
-  DynamixelConfig_Gain.msg
-  DynamixelConfig_Limit.msg
-  DynamixelConfig_Mode.msg
-
   DynamixelError.msg
+
+  # read/write
+  DynamixelOption_Config.msg
+  DynamixelOption_Extra.msg
+  DynamixelOption_Gain.msg
+  DynamixelOption_Limit.msg
+  DynamixelOption_Mode.msg
     
+  # write専用
+  DynamixelStateFree.msg
   DynamixelCommand_Profile.msg
   DynamixelCommand_X_ControlCurrent.msg
   DynamixelCommand_X_ControlCurrentPosition.msg

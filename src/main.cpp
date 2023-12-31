@@ -12,23 +12,23 @@ bool DynamixelHandler::Initialize(){
     ros::NodeHandle nh_p("~");
 
     // Subscriber / Publisherの設定
-    sub_cmd_free_   = nh.subscribe("/dynamixel/cmd_free",   10, DynamixelHandler::CallBackDxlCommandFree);
+    sub_cmd_free_   = nh.subscribe("/dynamixel/cmd_free",    10, DynamixelHandler::CallBackDxlCommandFree);
     sub_cmd_profile_= nh.subscribe("/dynamixel/cmd/profile", 10, DynamixelHandler::CallBackDxlCommand_Profile);
     sub_cmd_x_pos_  = nh.subscribe("/dynamixel/cmd/x/position", 10, DynamixelHandler::CallBackDxlCommand_X_Position);
     sub_cmd_x_vel_  = nh.subscribe("/dynamixel/cmd/x/velocity", 10, DynamixelHandler::CallBackDxlCommand_X_Velocity);
     sub_cmd_x_cur_  = nh.subscribe("/dynamixel/cmd/x/current",  10, DynamixelHandler::CallBackDxlCommand_X_Current);
     sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/cmd/x/current_position",  10, DynamixelHandler::CallBackDxlCommand_X_CurrentPosition);
     sub_cmd_x_epos_ = nh.subscribe("/dynamixel/cmd/x/extended_position", 10, DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition);
-    sub_config_gain_ = nh.subscribe("/dynamixel/config/gain/w", 10, DynamixelHandler::CallBackDxlConfig_Gain);
-    sub_config_mode_ = nh.subscribe("/dynamixel/config/mode/w", 10, DynamixelHandler::CallBackDxlConfig_Mode);
-    sub_config_limit_= nh.subscribe("/dynamixel/config/limit/w",10, DynamixelHandler::CallBackDxlConfig_Limit);
+    sub_opt_gain_ = nh.subscribe("/dynamixel/opt/gain/w", 10, DynamixelHandler::CallBackDxlOption_Gain);
+    sub_opt_mode_ = nh.subscribe("/dynamixel/opt/mode/w", 10, DynamixelHandler::CallBackDxlOption_Mode);
+    sub_opt_limit_= nh.subscribe("/dynamixel/opt/limit/w",10, DynamixelHandler::CallBackDxlOption_Limit);
 
-    pub_state_free_   = nh.advertise<dynamixel_handler::DynamixelStateFree>("/dynamixel/state_free", 10);
-    pub_state_        = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
-    pub_error_        = nh.advertise<dynamixel_handler::DynamixelError>("/dynamixel/error", 10);
-    pub_config_limit_ = nh.advertise<dynamixel_handler::DynamixelConfig_Limit>("/dynamixel/config/limit/r", 10);
-    pub_config_gain_  = nh.advertise<dynamixel_handler::DynamixelConfig_Gain>("/dynamixel/config/gain/r", 10);
-    pub_config_mode_  = nh.advertise<dynamixel_handler::DynamixelConfig_Mode>("/dynamixel/config/mode/r", 10);
+    pub_st_free_   = nh.advertise<dynamixel_handler::DynamixelStateFree>("/dynamixel/st_free", 10);
+    pub_state_     = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
+    pub_error_     = nh.advertise<dynamixel_handler::DynamixelError>("/dynamixel/error", 10);
+    pub_opt_limit_ = nh.advertise<dynamixel_handler::DynamixelOption_Limit>("/dynamixel/opt/limit/r", 10);
+    pub_opt_gain_  = nh.advertise<dynamixel_handler::DynamixelOption_Gain>("/dynamixel/opt/gain/r", 10);
+    pub_opt_mode_  = nh.advertise<dynamixel_handler::DynamixelOption_Mode>("/dynamixel/opt/mode/r", 10);
 
     // 通信の開始
     int baudrate; string device_name;
@@ -42,41 +42,40 @@ bool DynamixelHandler::Initialize(){
 
     // serial通信のvarbose設定
     bool serial_varbose;
-    if (!nh_p.getParam("dyn_comm_varbose", serial_varbose)) serial_varbose = false;
+    if (!nh_p.getParam("dyn_comm/varbose", serial_varbose)) serial_varbose = false;
     dyn_comm_.set_varbose(serial_varbose);
 
     // serial通信のretry設定
     int num_try, msec_interval;
-    if (!nh_p.getParam("dyn_comm_retry_num",     num_try      )) num_try       = 5;
-    if (!nh_p.getParam("dyn_comm_inerval_msec",  msec_interval)) msec_interval = 10;
+    if (!nh_p.getParam("dyn_comm/retry_num",     num_try      )) num_try       = 5;
+    if (!nh_p.getParam("dyn_comm/inerval_msec",  msec_interval)) msec_interval = 10;
     dyn_comm_.set_retry_config(num_try, msec_interval);
     // return TmpTest();
 
     // main loop の設定
     if (!nh_p.getParam("loop_rate",        loop_rate_ ))        loop_rate_ =  50;
-    if (!nh_p.getParam("ratio_state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
-    if (!nh_p.getParam("ratio_config_read", ratio_config_pub_)) ratio_config_pub_ =  0;
-    if (!nh_p.getParam("ratio_error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
-    if (!nh_p.getParam("ratio_varbose_loop", ratio_mainloop_ )) ratio_mainloop_   =  100;
+    if (!nh_p.getParam("ratio/state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
+    if (!nh_p.getParam("ratio/option_read", ratio_option_pub_)) ratio_option_pub_ =  0;
+    if (!nh_p.getParam("ratio/error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
+    if (!nh_p.getParam("ratio/varbose_loop", ratio_mainloop_ )) ratio_mainloop_   =  100;
     if (!nh_p.getParam("max_log_width",      width_log_      )) width_log_        = 7;
-    if (!nh_p.getParam("use_slipt_write", use_slipt_write_)) use_slipt_write_ =  false;
-    if (!nh_p.getParam("use_slipt_read",  use_slipt_read_ )) use_slipt_read_  =  false;
-    if (!nh_p.getParam("use_fast_read",   use_fast_read_  )) use_fast_read_   =  true;
-    if (!nh_p.getParam("max_log_width",    width_log_)) width_log_ = 7;
-    if (!nh_p.getParam("varbose_write_cmd", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
-    if (!nh_p.getParam("varbose_write_cfg", varbose_write_cfg_ )) varbose_write_cfg_ =  false;
-    if (!nh_p.getParam("varbose_read_st",     varbose_read_st_     )) varbose_read_st_     =  false;
-    if (!nh_p.getParam("varbose_read_st_err", varbose_read_st_err_ )) varbose_read_st_err_ =  false;
-    if (!nh_p.getParam("varbose_read_hwerr",  varbose_read_hwerr_  )) varbose_read_hwerr_  =  false;
-    if (!nh_p.getParam("varbose_read_cfg",    varbose_read_cfg_    )) varbose_read_cfg_    =  false;
-    if (!nh_p.getParam("varbose_read_cfg_err",varbose_read_cfg_err_)) varbose_read_cfg_err_=  false;
-    if (!nh_p.getParam("varbose_callback", varbose_callback_ )) varbose_callback_  =  false;
+    if (!nh_p.getParam("use/slipt_write", use_slipt_write_)) use_slipt_write_ =  false;
+    if (!nh_p.getParam("use/slipt_read",  use_slipt_read_ )) use_slipt_read_  =  false;
+    if (!nh_p.getParam("use/fast_read",   use_fast_read_  )) use_fast_read_   =  true;
+    if (!nh_p.getParam("varbose/callback",     varbose_callback_  )) varbose_callback_  =  false;
+    if (!nh_p.getParam("varbose/write_commad", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
+    if (!nh_p.getParam("varbose/write_option", varbose_write_opt_ )) varbose_write_opt_ =  false;
+    if (!nh_p.getParam("varbose/read_state/raw", varbose_read_st_     )) varbose_read_st_     =  false;
+    if (!nh_p.getParam("varbose/read_state/err", varbose_read_st_err_ )) varbose_read_st_err_ =  false;
+    if (!nh_p.getParam("varbose/read_option/raw",varbose_read_opt_    )) varbose_read_opt_    =  false;
+    if (!nh_p.getParam("varbose/read_option/err",varbose_read_opt_err_)) varbose_read_opt_err_=  false;
+    if (!nh_p.getParam("varbose/read_hardware_error",varbose_read_hwerr_  )) varbose_read_hwerr_  =  false;
 
 
     // id_listの作成
     int num_expexted, id_max; 
-    if (!nh_p.getParam("init_expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
-    if (!nh_p.getParam("init_auto_search_max_id",       id_max        )) id_max        = 35;
+    if (!nh_p.getParam("init/expected_servo_num",       num_expexted  )) num_expexted  = 0; // 0のときはチェックしない
+    if (!nh_p.getParam("init/auto_search_max_id",       id_max        )) id_max        = 35;
     auto num_found = ScanDynamixels(id_max);
     if( num_found==0 ) { // 見つからなかった場合は初期化失敗で終了
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
@@ -90,15 +89,15 @@ bool DynamixelHandler::Initialize(){
     // 最初の一回は全ての情報をread & publish
     if ( SyncReadStateValues()     ) BroadcastDxlState();
     if ( SyncReadHardwareErrors()  ) BroadcastDxlError();
-    if ( SyncReadCfgParams_Mode()  ) BroadcastDxlConfig_Mode();
-    if ( SyncReadCfgParams_Gain()  ) BroadcastDxlConfig_Gain();
-    while ( ros::ok() && cfg_param_limit_.size() != id_list_.size() ) SyncReadCfgParams_Limit(); // Limitは読み取れないとまずいので，確実に．
-        BroadcastDxlConfig_Limit();
+    if ( SyncReadOption_Mode()  ) BroadcastDxlOption_Mode();
+    if ( SyncReadOption_Gain()  ) BroadcastDxlOption_Gain();
+    while ( ros::ok() && option_limit_.size() != id_list_.size() ) SyncReadOption_Limit(); // Limitは読み取れないとまずいので，確実に．
+        BroadcastDxlOption_Limit();
 
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;
-    if (!nh_p.getParam("init_hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
-    if (!nh_p.getParam("init_torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
+    if (!nh_p.getParam("init/hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
+    if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION, TORQUE_DISABLE);
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
@@ -117,14 +116,14 @@ bool DynamixelHandler::Initialize(){
 
     //  readする情報の設定
     bool read_pwm, read_cur, read_vel, read_pos, read_vel_traj, read_pos_traj, read_volt, read_temp;
-    if (!nh_p.getParam("read_present_pwm",          read_pwm))      read_pwm = false;
-    if (!nh_p.getParam("read_present_current",      read_cur))      read_cur = true;
-    if (!nh_p.getParam("read_present_velocity",     read_vel))      read_vel = true;
-    if (!nh_p.getParam("read_present_position",     read_pos))      read_pos = true;
-    if (!nh_p.getParam("read_velocity_trajectory",  read_vel_traj)) read_vel_traj = false;
-    if (!nh_p.getParam("read_position_trajectory",  read_pos_traj)) read_pos_traj = false;
-    if (!nh_p.getParam("read_present_input_voltage",read_volt))     read_volt = false;
-    if (!nh_p.getParam("read_present_temperature",  read_temp))     read_temp = false;
+    if (!nh_p.getParam("read/present_pwm",          read_pwm))      read_pwm = false;
+    if (!nh_p.getParam("read/present_current",      read_cur))      read_cur = true;
+    if (!nh_p.getParam("read/present_velocity",     read_vel))      read_vel = true;
+    if (!nh_p.getParam("read/present_position",     read_pos))      read_pos = true;
+    if (!nh_p.getParam("read/velocity_trajectory",  read_vel_traj)) read_vel_traj = false;
+    if (!nh_p.getParam("read/position_trajectory",  read_pos_traj)) read_pos_traj = false;
+    if (!nh_p.getParam("read/present_input_voltage",read_volt))     read_volt = false;
+    if (!nh_p.getParam("read/present_temperature",  read_temp))     read_temp = false;
     list_read_state_.clear();
     if ( read_pwm ) list_read_state_.insert(PRESENT_PWM);
     if ( read_cur ) list_read_state_.insert(PRESENT_CURRENT);
@@ -178,14 +177,14 @@ void DynamixelHandler::MainLoop(){
         bool is_err_suc = SyncReadHardwareErrors();
         if (is_err_suc) BroadcastDxlError();
     }
-    if ( ratio_config_pub_!=0 )
-    if ( cnt % ratio_config_pub_ == 0 ) { // ratio_config_pub_の割合で実行
-        bool is_mode_suc = SyncReadCfgParams_Mode(); // 処理を追加する可能性を考えて，変数を別で用意する冗長な書き方をしている．
-        if (is_mode_suc) BroadcastDxlConfig_Mode();
-        bool is_lim_suc = SyncReadCfgParams_Limit();
-        if (is_lim_suc)  BroadcastDxlConfig_Limit();
-        bool is_gain_suc = SyncReadCfgParams_Gain();
-        if (is_gain_suc) BroadcastDxlConfig_Gain();
+    if ( ratio_option_pub_!=0 )
+    if ( cnt % ratio_option_pub_ == 0 ) { // ratio_option_pub_の割合で実行
+        bool is_mode_suc = SyncReadOption_Mode(); // 処理を追加する可能性を考えて，変数を別で用意する冗長な書き方をしている．
+        if (is_mode_suc) BroadcastDxlOption_Mode();
+        bool is_lim_suc = SyncReadOption_Limit();
+        if (is_lim_suc)  BroadcastDxlOption_Limit();
+        bool is_gain_suc = SyncReadOption_Gain();
+        if (is_gain_suc) BroadcastDxlOption_Gain();
     }
 
 /* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
@@ -196,9 +195,9 @@ void DynamixelHandler::MainLoop(){
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     /* SubscribeDynamixelCmd */ros::spinOnce();
     if ( !use_slipt_write_ ) 
-        SyncWriteCmdValues(list_wirte_cmd_);
+        SyncWriteCommandValues(list_wirte_cmd_);
     else for (auto each_cmd : list_wirte_cmd_) 
-        SyncWriteCmdValues(each_cmd); 
+        SyncWriteCommandValues(each_cmd); 
     is_cmd_updated_.clear();
     list_wirte_cmd_.clear();
 
