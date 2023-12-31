@@ -1,8 +1,6 @@
 time stamp
 uint16[]  id_list
 
-float64[] homing_offset__deg
-float64[] moving_threshold__deg_s
 float64[] temperature_limit__degC
 float64[] max_voltage_limit__V
 float64[] min_voltage_limit__V

@@ -23,7 +23,7 @@
         <remap from="/dynamixel/cmd_free"   to="/dynamixel/cmd_free"/>
         <remap from="/dynamixel/state_free" to="/dynamixel/state_free"/>
         <!-- 書き込みのみ -->
-        <remap from="/dynamixel/cmd/option"              to="/dynamixel/cmd/option"/>
+        <remap from="/dynamixel/cmd/profile"             to="/dynamixel/cmd/profile"/>
         <remap from="/dynamixel/cmd/x/position"          to="/dynamixel/cmd/x/position"/>
         <remap from="/dynamixel/cmd/x/velocity"          to="/dynamixel/cmd/x/velocity"/>
         <remap from="/dynamixel/cmd/x/current"           to="/dynamixel/cmd/x/current"/>

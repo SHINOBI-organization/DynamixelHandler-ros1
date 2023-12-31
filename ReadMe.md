@@ -154,7 +154,7 @@ paramの章を参照
  - /dynamixel/cmd/x/position
  - /dynamixel/cmd/x/extended_position
  - /dynamixel/cmd/x/current_position 
- - /dynamixel/cmd/option : 未実装
+ - /dynamixel/cmd/profile : 未実装
  - /dynamixel/config/gain/w : 未実装
  - /dynamixel/config/limit/w : 未実装
  - /dynamixel/config/mode/w : 未実装
@@ -279,11 +279,11 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 
 ### 加速度
  - acceleration_limit   : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - profile_acceleration : 未実装，`/dynamixel/cmd/option`をsubすると設定されるようにしたい．
+ - profile_acceleration : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
 
 ### 速度
  - velocity_limit      : 未実装，`/dynamixel/config/limit/w`のsubで設定し，現在値を`/dynamixel/config/limit/r`としてpubできるにようにする．
- - profile_velocity    : 未実装，`/dynamixel/cmd/option`をsubすると設定されるようにしたい．
+ - profile_velocity    : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
  - goal_velocity       : `/dynamixel/cmd/x/velocity`をsubすると設定され，loop_rateの周期で書き込まれる．
  - present_velocity    : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
  - velocity_trajectory : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．

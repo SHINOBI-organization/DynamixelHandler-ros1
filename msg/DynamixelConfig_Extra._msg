@@ -1,11 +1,13 @@
 time stamp
 uint16[] id_list
 
- bus_watchbdog__ms          
- realtime_tick__us          
- registered_instruction 
- shutdown               
- moving                 
- moving_status          
- led                    
- status_return_level    
+float64[] homing_offset__deg
+float64[] moving_threshold__deg_s
+float64[] bus_watchbdog__ms          
+float64[] realtime_tick__us          
+uint8[] registered_instruction 
+uint8[] shutdown               
+uint8[] moving                 
+uint8[] moving_status          
+uint8[] led                    
+uint8[] status_return_level    

@@ -64,7 +64,7 @@ add_message_files(
 
   DynamixelError.msg
     
-  DynamixelCommand_Option.msg
+  DynamixelCommand_Profile.msg
   DynamixelCommand_X_ControlCurrent.msg
   DynamixelCommand_X_ControlCurrentPosition.msg
   DynamixelCommand_X_ControlExtendedPosition.msg

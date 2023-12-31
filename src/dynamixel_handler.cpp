@@ -27,7 +27,7 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
     return id_list_.size();
 }
 
-// 
+// 回転数が消えることを考慮して，モータをリブートする．
 bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after){
     if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
@@ -48,6 +48,7 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
     return is_clear;
 }
 
+// モータを停止させてからトルクを入れる．
 bool DynamixelHandler::TorqueOn(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     // 角度の同期と速度の停止
@@ -60,6 +61,7 @@ bool DynamixelHandler::TorqueOn(uint8_t id){
     return is_enable;
 }
 
+// トルクを切る
 bool DynamixelHandler::TorqueOff(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     // トルクを切る
@@ -70,6 +72,7 @@ bool DynamixelHandler::TorqueOff(uint8_t id){
     return is_disable;
 }
 
+// モータの動作モードを変更する．連続で変更するときは1秒のインターバルを入れる
 bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
@@ -89,6 +92,7 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     return is_changed;
 }
 
+// モータの動作を停止させる．
 bool DynamixelHandler::StopRotation(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     auto now_pos = ReadPresentPosition(id);
@@ -348,7 +352,7 @@ void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::Dynamixel
         for (auto id : id_list) dyn_comm_.Reboot(id);
 }
 
-void DynamixelHandler::CallBackDxlCommand_Option(const dynamixel_handler::DynamixelCommand_Option& msg) {
+void DynamixelHandler::CallBackDxlCommand_Profile(const dynamixel_handler::DynamixelCommand_Profile& msg) {
 
 }
 
@@ -465,8 +469,6 @@ void DynamixelHandler::CallBackDxlConfig_Limit(const dynamixel_handler::Dynamixe
     // if (varbose_callback_) ROS_INFO("CallBackDxlConfig_Limit");
     bool is_any = false;
 
-    if (msg.id_list.size() == msg.homing_offset__deg.size()        ){is_any=true;}
-    if (msg.id_list.size() == msg.moving_threshold__deg_s.size()   ){is_any=true;}
     if (msg.id_list.size() == msg.temperature_limit__degC.size()   ){is_any=true;}
     if (msg.id_list.size() == msg.max_voltage_limit__V.size()      ){is_any=true;}
     if (msg.id_list.size() == msg.min_voltage_limit__V.size()      ){is_any=true;}

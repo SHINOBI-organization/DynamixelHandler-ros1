@@ -13,7 +13,7 @@ using ros::Time;
 #include <dynamixel_handler/DynamixelConfig_Gain.h>
 #include <dynamixel_handler/DynamixelConfig_Mode.h>
 #include <dynamixel_handler/DynamixelCommandFree.h>
-#include <dynamixel_handler/DynamixelCommand_Option.h>
+#include <dynamixel_handler/DynamixelCommand_Profile.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlPosition.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlVelocity.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlCurrent.h>
@@ -70,7 +70,7 @@ class DynamixelHandler {
         static void CallBackDxlConfig_Gain  (const dynamixel_handler::DynamixelConfig_Gain& msg);  // todo
         static void CallBackDxlConfig_Mode  (const dynamixel_handler::DynamixelConfig_Mode& msg);  // todo
         static void CallBackDxlCommandFree    (const dynamixel_handler::DynamixelCommandFree& msg);    // todo
-        static void CallBackDxlCommand_Option (const dynamixel_handler::DynamixelCommand_Option& msg); // todo
+        static void CallBackDxlCommand_Profile (const dynamixel_handler::DynamixelCommand_Profile& msg); // todo
         static void CallBackDxlCommand_X_Position        (const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg);
         static void CallBackDxlCommand_X_Velocity        (const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg);
         static void CallBackDxlCommand_X_Current         (const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg);
@@ -84,7 +84,7 @@ class DynamixelHandler {
         static inline ros::Publisher  pub_config_gain_;
         static inline ros::Publisher  pub_config_mode_;
         static inline ros::Subscriber sub_cmd_free_;
-        static inline ros::Subscriber sub_cmd_option_;
+        static inline ros::Subscriber sub_cmd_profile_;
         static inline ros::Subscriber sub_cmd_x_pos_;
         static inline ros::Subscriber sub_cmd_x_vel_;
         static inline ros::Subscriber sub_cmd_x_cur_;

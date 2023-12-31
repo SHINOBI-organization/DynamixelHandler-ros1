@@ -13,7 +13,7 @@ bool DynamixelHandler::Initialize(){
 
     // Subscriber / Publisherの設定
     sub_cmd_free_   = nh.subscribe("/dynamixel/cmd_free",   10, DynamixelHandler::CallBackDxlCommandFree);
-    sub_cmd_option_ = nh.subscribe("/dynamixel/cmd/option", 10, DynamixelHandler::CallBackDxlCommand_Option);
+    sub_cmd_profile_= nh.subscribe("/dynamixel/cmd/profile", 10, DynamixelHandler::CallBackDxlCommand_Profile);
     sub_cmd_x_pos_  = nh.subscribe("/dynamixel/cmd/x/position", 10, DynamixelHandler::CallBackDxlCommand_X_Position);
     sub_cmd_x_vel_  = nh.subscribe("/dynamixel/cmd/x/velocity", 10, DynamixelHandler::CallBackDxlCommand_X_Velocity);
     sub_cmd_x_cur_  = nh.subscribe("/dynamixel/cmd/x/current",  10, DynamixelHandler::CallBackDxlCommand_X_Current);

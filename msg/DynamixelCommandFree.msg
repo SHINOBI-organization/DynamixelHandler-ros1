@@ -1,4 +1,4 @@
-string    command # "write", "read", "reboot", "disable", "enable"
+string    command # "clear", "reboot", "disable", "enable" ## "write", "read"　は未実装
 uint16[]  id_list
 
 string    write_read_parameter
