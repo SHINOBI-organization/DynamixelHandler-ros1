@@ -146,7 +146,7 @@ void DynamixelHandler::MainLoop(){
     static ros::Rate rate(loop_rate_);
 
     //* デバック
-    static float rtime = 0.0, wtime = 0.0, suc_read_part=0.0, suc_read_full=0.0, num_st_read=0.001;
+    static float rtime=0, wtime=0, suc_read_part=1, suc_read_full=1, num_st_read=1;
     if ( ratio_mainloop_ !=0 ) 
     if ( cnt % ratio_mainloop_ == 0) {
         float partial_suc = 100*suc_read_part/num_st_read;float full_suc    = 100*suc_read_full/num_st_read;
@@ -155,7 +155,7 @@ void DynamixelHandler::MainLoop(){
         if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
         /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 
     }
-    if ( cnt % max(loop_rate_, ratio_mainloop_) == 0) // 成功率の計測を初期化
+    if ( cnt % max({loop_rate_, ratio_mainloop_, 10}) == 0) // 成功率の計測を初期化
         suc_read_part = suc_read_full = num_st_read=0.00001;
         
 /* 処理時間時間の計測 */ auto rstart = system_clock::now();
@@ -191,7 +191,6 @@ void DynamixelHandler::MainLoop(){
 
 /* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
 
-
 /* 処理時間時間の計測 */ auto wstart = system_clock::now();
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
@@ -205,7 +204,7 @@ void DynamixelHandler::MainLoop(){
 
 /* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 
-    rate.sleep();
+     rate.sleep();
 }
 
 void DynamixelHandler::Terminate(int sig){
