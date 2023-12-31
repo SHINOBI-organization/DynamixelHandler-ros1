@@ -149,9 +149,11 @@ void DynamixelHandler::MainLoop(){
     static float rtime = 0.0, wtime = 0.0, suc_read_part=0.0, suc_read_full=0.0, num_st_read=0.001;
     if ( ratio_mainloop_ !=0 ) 
     if ( cnt % ratio_mainloop_ == 0) {
-        ROS_INFO("Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
-            cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, 100*suc_read_part/num_st_read, 100*suc_read_full/num_st_read);
-        rtime = wtime = 0.0; 
+        float partial_suc = 100*suc_read_part/num_st_read;float full_suc    = 100*suc_read_full/num_st_read;
+        char msg[100]; sprintf(msg, "Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
+                                cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, partial_suc, full_suc);
+        if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
+        /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 
     }
     if ( cnt % max(loop_rate_, ratio_mainloop_) == 0) // 成功率の計測を初期化
         suc_read_part = suc_read_full = num_st_read=0.00001;
