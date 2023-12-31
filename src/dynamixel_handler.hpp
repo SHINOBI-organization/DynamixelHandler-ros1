@@ -96,14 +96,14 @@ class DynamixelHandler {
 
     private:
         DynamixelHandler() = delete;
-        //* Dynamixelとの通信を超えた機能
+        //* 単体通信を組み合わせた上位機能
         static uint8_t ScanDynamixels(uint8_t id_max);
         static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after=TORQUE_ENABLE);
         static bool TorqueOn(uint8_t servo_id);
         static bool TorqueOff(uint8_t servo_id);
         static bool StopRotation(uint8_t servo_id);
         static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode, DynamixelTorquePermission after=TORQUE_ENABLE);
-    //* Dynamixel単体との通信の組み合わせ
+        //* Dynamixel単体との通信による下位機能
         static uint8_t ReadHardwareError(uint8_t servo_id);
         static double  ReadPresentPosition(uint8_t servo_id);
         static double  ReadHomingOffset(uint8_t servo_id);
@@ -114,7 +114,6 @@ class DynamixelHandler {
         static bool WriteHomingOffset(uint8_t servo_id, double offset);
         static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
-
     
         //* 各種のフラグとパラメータ
         static inline int  loop_rate_    = 50;
@@ -133,8 +132,10 @@ class DynamixelHandler {
         static inline bool varbose_read_hwerr_   = false;
         static inline bool varbose_read_cfg_     = false;
         static inline bool varbose_read_cfg_err_ = false;
+
         //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
+
         //* Dynamixelを扱うための変数群 
         enum CmdValueIndex { //　cmd_values_のIndex, サーボに毎周期で書き込むことができる値
             GOAL_PWM      = 0,
