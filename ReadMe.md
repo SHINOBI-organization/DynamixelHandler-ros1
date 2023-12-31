@@ -5,12 +5,27 @@ Robotis社の[Dynamixel](https://e-shop.robotis.co.jp/list.php?c_id=89)をROSか
 Dynamixelとやり取りを行うライブラリは[別のリポジトリ](https://github.com/SHINOBI-organization/lib_dynamixel)として管理しており，git submoduleの機能を使って取り込んでいる．
 
 note: ROS1のみ対応
+
 note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど予定している）
 
 ## features of this package
- - Dynamixelを繋いでnodeを起動するだけで，連結したDynamixelを自動認識．
- - 
-
+ - node を起動するだけで連結したDynamixelを自動で認識
+ - ROS topic の pub/sub のみでDynamixelを制御可能
+   - 指定した周期で指定した情報を state topic としてpub (デフォルト: 電流/速度/位置, 50Hz)
+   - 指定した周期でハードウェアエラーを error topic としてpub (デフォルト: 0.5Hz)
+   - subした command topic に合わせて制御モードを自動で変更 (電流/速度/位置/電流制限付き位置/拡張位置制御に対応)
+   - sub/pubされる情報はパルス値ではなく物理量
+ - Serial通信の Raed/Write は ROS node の周期と同期
+ - node を kill したタイミングで動作を停止
+ - 初期化時にエラーを自動でクリア
+ - エラークリア時の回転数消失問題をhoming offsetにより自動補正
+ - ros param から各種 log 表示の制御が可能
+   - Serial通信のエラー率
+   - Serial通信の Read/Write にかかる平均時間
+   - Read/Write されるパルス値
+   - Readに失敗したID
+   - etc...
+     
 ## how to install
 
 ```
@@ -24,7 +39,7 @@ $ git submodule update
 ## how to use
 
 ### 1. Dynamixelを接続
-   DynaimixelをデイジーチェーンにしてUSBで接続する．
+   DynaimixelをディジーチェーンにしてUSBで接続する．
 
    note: baudrateがすべて同一かつ，idに重複がないように事前に設定すること
    
@@ -59,12 +74,13 @@ $ roslaunch dynamixel_handler dynamixel_handler.launch
 ```
 
 ### 3. TopicのSub/Pub
-位置制御モード(position control mode)で角度を90degにしたい場合
+ID:5のDynamixelを位置制御モード(position control mode)で角度を90degにしたい場合
 
 角度の制御
 ```
 $ rostopic pub /dynamixel/cmd/x/position dynamixel_handler/DynamixelCommand_X_ControlPosition "{id_list: [5], position__deg: [90]}" -1
 ```
+ID:5のDynamixelが位置制御モードでなかった場合は自動で変換される．
 
 "read_present_current", "read_present_velocity", "read_present_position" をtrueに設定した場合
 
@@ -98,11 +114,12 @@ pos_trajectory__deg: []
 temperature__degC: []
 input_voltage__V: []
 ```
-
+どの情報をpubするかは ros param から設定可能．
+以下のparamを参照
 
 ## topic
 #### Subscribed by dyanmixel_handler　
- - /dynamixel/cmd_free
+ - /dynamixel/cmd_free : 
  - /dynamixel/cmd/x/current
  - /dynamixel/cmd/x/velocity
  - /dynamixel/cmd/x/position
@@ -120,6 +137,8 @@ input_voltage__V: []
  - /dynamixel/config/gain/r
  - /dynamixel/config/limit/r
  - /dynamixel/config/mode/r
+
+## param
 
 ## 初期設定と注意事項
 
