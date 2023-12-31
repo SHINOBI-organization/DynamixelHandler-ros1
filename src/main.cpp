@@ -7,10 +7,7 @@ bool DynamixelHandler::TmpTest(){
     return false;
 }
 
-bool DynamixelHandler::Initialize(){
-    ros::NodeHandle nh;
-    ros::NodeHandle nh_p("~");
-
+bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     // Subscriber / Publisherの設定
     sub_cmd_free_   = nh.subscribe("/dynamixel/cmd_free",    10, DynamixelHandler::CallBackDxlCommandFree);
     sub_cmd_profile_= nh.subscribe("/dynamixel/cmd/profile", 10, DynamixelHandler::CallBackDxlCommand_Profile);
@@ -29,6 +26,8 @@ bool DynamixelHandler::Initialize(){
     pub_opt_limit_ = nh.advertise<dynamixel_handler::DynamixelOption_Limit>("/dynamixel/opt/limit/r", 10);
     pub_opt_gain_  = nh.advertise<dynamixel_handler::DynamixelOption_Gain>("/dynamixel/opt/gain/r", 10);
     pub_opt_mode_  = nh.advertise<dynamixel_handler::DynamixelOption_Mode>("/dynamixel/opt/mode/r", 10);
+
+    ros::NodeHandle nh_p("~");
 
     // 通信の開始
     int baudrate; string device_name;
@@ -141,23 +140,23 @@ using std::chrono::system_clock;
 using std::chrono::duration_cast;
 using std::chrono::microseconds;
 
-void DynamixelHandler::MainLoop(){
+void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     static int cnt = -1; cnt++;
-    static ros::Rate rate(loop_rate_);
-
-    //* デバック
     static float rtime=0, wtime=0, suc_read_part=1, suc_read_full=1, num_st_read=1;
-    if ( ratio_mainloop_ !=0 ) 
-    if ( cnt % ratio_mainloop_ == 0) {
-        float partial_suc = 100*suc_read_part/num_st_read;float full_suc    = 100*suc_read_full/num_st_read;
-        char msg[100]; sprintf(msg, "Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
-                                cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, partial_suc, full_suc);
-        if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
-        /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 
-    }
-    if ( cnt % max({loop_rate_, ratio_mainloop_, 10}) == 0) // 成功率の計測を初期化
-        suc_read_part = suc_read_full = num_st_read=0.00001;
-        
+
+    
+/* 処理時間時間の計測 */ auto wstart = system_clock::now();
+
+    //* topicをSubscribe & Dynamixelへ目標角をWrite
+    if ( !use_slipt_write_ ) 
+        SyncWriteCommandValues(list_wirte_cmd_);
+    else for (auto each_cmd : list_wirte_cmd_) 
+        SyncWriteCommandValues(each_cmd); 
+    is_cmd_updated_.clear();
+    list_wirte_cmd_.clear();
+
+/* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
+
 /* 処理時間時間の計測 */ auto rstart = system_clock::now();
 
     //* Dynamixelから状態Read & topicをPublish
@@ -191,20 +190,18 @@ void DynamixelHandler::MainLoop(){
 
 /* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
 
-/* 処理時間時間の計測 */ auto wstart = system_clock::now();
-
-    //* topicをSubscribe & Dynamixelへ目標角をWrite
-    /* SubscribeDynamixelCmd */ros::spinOnce();
-    if ( !use_slipt_write_ ) 
-        SyncWriteCommandValues(list_wirte_cmd_);
-    else for (auto each_cmd : list_wirte_cmd_) 
-        SyncWriteCommandValues(each_cmd); 
-    is_cmd_updated_.clear();
-    list_wirte_cmd_.clear();
-
-/* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
-
-     rate.sleep();
+    //* デバック
+    if ( ratio_mainloop_ !=0 ) 
+    if ( cnt % ratio_mainloop_ == 0) {
+        float partial_suc = 100*suc_read_part/num_st_read;float full_suc    = 100*suc_read_full/num_st_read;
+        char msg[100]; sprintf(msg, "Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
+                                cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, partial_suc, full_suc);
+        if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
+        /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 
+    }
+    if ( cnt % max({loop_rate_, ratio_mainloop_, 10}) == 0) // 成功率の計測を初期化
+        suc_read_part = suc_read_full = num_st_read=0.00001;
+        
 }
 
 void DynamixelHandler::Terminate(int sig){
@@ -217,14 +214,17 @@ void DynamixelHandler::Terminate(int sig){
 
 int main(int argc, char **argv) {
     ros::init(argc, argv, "dynamixel_handler_node", ros::init_options::NoSigintHandler);
-    if ( !DynamixelHandler::Initialize() ) {
+    ros::NodeHandle nh; // DynaxeimlHandlerのStaticメンバとして宣言すると，ros::init()の前に呼ばれちゃうみたいなので，ここで宣言する．
+    if ( !DynamixelHandler::Initialize(nh) ) {
         ROS_ERROR("Failed to initialize DynamixelHandler");
         return 0;
     }
     signal(SIGINT, DynamixelHandler::Terminate);
 
-    while(ros::ok()) {
-        DynamixelHandler::MainLoop();
-    }
-
+    // ros::Timer timer = nh.createTimerを使って書き換え
+    ros::Timer timer = nh.createTimer(
+        ros::Duration(1.0/DynamixelHandler::loop_rate_), 
+        DynamixelHandler::MainLoop
+    );
+    ros::spin();
 }

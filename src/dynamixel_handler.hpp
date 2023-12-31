@@ -59,9 +59,10 @@ class DynamixelHandler {
     public:
         //* ROS 初期設定とメインループ
         static bool TmpTest();
-        static bool Initialize();
-        static void MainLoop();
+        static bool Initialize(ros::NodeHandle& nh);
+        static void MainLoop(const ros::TimerEvent& e);
         static void Terminate(int sig);
+        static inline int loop_rate_ = 50;
 
         //* ROS publishを担う関数と subscliber callback関数
         static void BroadcastDxlState();
@@ -121,7 +122,6 @@ class DynamixelHandler {
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
     
         //* 各種のフラグとパラメータ
-        static inline int  loop_rate_    = 50;
         static inline int  ratio_state_pub_  = 1; 
         static inline int  ratio_option_pub_ = 100; // 0の時は初回のみ
         static inline int  ratio_error_pub_  = 100;
