@@ -95,11 +95,13 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
 // モータの動作を停止させる．
 bool DynamixelHandler::StopRotation(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
+    auto cur_lim = cfg_param_limit_[id][CURRENT_LIMIT];
     auto now_pos = ReadPresentPosition(id);
     cmd_values_[id][GOAL_POSITION]      = now_pos;
     state_values_[id][PRESENT_POSITION] = now_pos;
     if ( !WriteGoalPosition(id, now_pos) ) return false; 
-    if ( !WriteGoalVelocity(id, 0.0)     ) return false; //この処理が失敗すると危険なので，トルク入れない．
+    if ( !WriteGoalVelocity(id, 0.0)     ) return false;
+    if ( !WriteGoalCurrent(id, cur_lim/5)) return false; // continuous torque は stall torque のだいたい　20%
     return true;
 }
 
@@ -132,6 +134,11 @@ bool DynamixelHandler::WriteHomingOffset(uint8_t id, double offset){
 bool DynamixelHandler::WriteGoalVelocity(uint8_t id, double vel){
     auto vel_pulse = goal_velocity.val2pulse(vel, model_[id]);
     return dyn_comm_.tryWrite(goal_velocity, id, vel_pulse);
+}
+
+bool DynamixelHandler::WriteGoalCurrent(uint8_t id, double cur){
+    auto cur_pulse = goal_current.val2pulse(cur, model_[id]);
+    return dyn_comm_.tryWrite(goal_current, id, cur_pulse);
 }
 
 bool DynamixelHandler::ReadTorqueEnable(uint8_t id){

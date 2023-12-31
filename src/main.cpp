@@ -57,9 +57,11 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("ratio_state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
     if (!nh_p.getParam("ratio_config_read", ratio_config_pub_)) ratio_config_pub_ =  0;
     if (!nh_p.getParam("ratio_error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
-    if (!nh_p.getParam("use_slipt_write", use_slipt_write_)) use_slipt_write_   =  false;
-    if (!nh_p.getParam("use_slipt_read",  use_slipt_read_ )) use_slipt_read_   =  false;
-    if (!nh_p.getParam("use_fast_read",   use_fast_read_  )) use_fast_read_    =  true;
+    if (!nh_p.getParam("ratio_varbose_loop", ratio_mainloop_ )) ratio_mainloop_   =  100;
+    if (!nh_p.getParam("max_log_width",      width_log_      )) width_log_        = 7;
+    if (!nh_p.getParam("use_slipt_write", use_slipt_write_)) use_slipt_write_ =  false;
+    if (!nh_p.getParam("use_slipt_read",  use_slipt_read_ )) use_slipt_read_  =  false;
+    if (!nh_p.getParam("use_fast_read",   use_fast_read_  )) use_fast_read_   =  true;
     if (!nh_p.getParam("max_log_width",    width_log_)) width_log_ = 7;
     if (!nh_p.getParam("varbose_write_cmd", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
     if (!nh_p.getParam("varbose_write_cfg", varbose_write_cfg_ )) varbose_write_cfg_ =  false;
@@ -69,8 +71,6 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("varbose_read_cfg",    varbose_read_cfg_    )) varbose_read_cfg_    =  false;
     if (!nh_p.getParam("varbose_read_cfg_err",varbose_read_cfg_err_)) varbose_read_cfg_err_=  false;
     if (!nh_p.getParam("varbose_callback", varbose_callback_ )) varbose_callback_  =  false;
-    if (!nh_p.getParam("varbose_mainloop", varbose_mainloop_ )) varbose_mainloop_  =  false;
-    bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
 
 
     // id_listの作成
@@ -148,12 +148,14 @@ void DynamixelHandler::MainLoop(){
 
     //* デバック
     static float rtime = 0.0, wtime = 0.0, suc_read_part=0.0, suc_read_full=0.0, num_st_read=0.001;
-    if ( varbose_mainloop_ !=0 ) 
-    if ( cnt % varbose_mainloop_ == 0) {
+    if ( ratio_mainloop_ !=0 ) 
+    if ( cnt % ratio_mainloop_ == 0) {
         ROS_INFO("Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
-            cnt, rtime/varbose_mainloop_, wtime/varbose_mainloop_, 100*suc_read_part/num_st_read, 100*suc_read_full/num_st_read);
-        rtime = 0.0; wtime = 0.0; suc_read_part=0.0; suc_read_full=0.0, num_st_read=0.001;
+            cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, 100*suc_read_part/num_st_read, 100*suc_read_full/num_st_read);
+        rtime = wtime = 0.0; 
     }
+    if ( cnt % max(loop_rate_, ratio_mainloop_) == 0) // 成功率の計測を初期化
+        suc_read_part = suc_read_full = num_st_read=0.00001;
         
 /* 処理時間時間の計測 */ auto rstart = system_clock::now();
 

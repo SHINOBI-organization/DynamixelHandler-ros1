@@ -75,15 +75,16 @@
         <param name="read_present_temperature"   value="false"/>
         
         <!-- デバック用 -->
-        <param name="varbose_mainloop"     value="100"/>
-        <param name="varbose_callback"     value="false"/>
-        <param name="varbose_write_cmd"    value="false"/>
-        <param name="varbose_write_cfg"    value="false"/>
-        <param name="varbose_read_st"      value="false"/>
-        <param name="varbose_read_st_err"  value="true"/>
-        <param name="varbose_read_hwerr"   value="true"/>
-        <param name="varbose_read_cfg"     value="false"/>
-        <param name="varbose_read_cfg_err" value="true"/>
+        <param name="ratio_varbose_loop"   value="100"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
+        <param name="max_log_width"        value="8"/>     <!-- 以下のlog出力で，サーボ何個ごとに改行を入れるか -->
+        <param name="varbose_callback"     value="false"/> <!-- コールバック関数の呼び出しを出力 -->
+        <param name="varbose_write_cmd"    value="false"/> <!-- 書き込みするcommandデータのpulse値を出力 -->
+        <param name="varbose_write_cfg"    value="false"/> <!-- 書き込みするconfigデータのpulse値を出力 -->
+        <param name="varbose_read_st"      value="false"/> <!-- 読み込んだstateデータのpulse値を出力 -->
+        <param name="varbose_read_st_err"  value="true"/>  <!-- stateデータの読み込みエラーを出力 -->
+        <param name="varbose_read_hwerr"   value="true"/>  <!-- 検出したHardware errorを出力 -->
+        <param name="varbose_read_cfg"     value="false"/> <!-- 読み込んだconfigデータのpulse値を出力 -->
+        <param name="varbose_read_cfg_err" value="true"/>  <!-- configデータの読み込みエラーを出力 -->
     </node>
 
 </launch>

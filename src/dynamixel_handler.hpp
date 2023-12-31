@@ -38,6 +38,8 @@ using std::set;
 using std::max_element;
 using std::min_element;
 using std::clamp;
+using std::min;
+using std::max;
 
 static const double DEG = M_PI/180.0; // degを単位に持つ数字に掛けるとradになる
 static double deg2rad(double deg){ return deg*DEG; }
@@ -111,6 +113,7 @@ class DynamixelHandler {
         static uint8_t ReadOperatingMode(uint8_t servo_id);
         static bool WriteGoalPosition(uint8_t servo_id, double position);
         static bool WriteGoalVelocity(uint8_t servo_id, double velocity);
+        static bool WriteGoalCurrent(uint8_t servo_id, double current);
         static bool WriteHomingOffset(uint8_t servo_id, double offset);
         static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
@@ -120,10 +123,11 @@ class DynamixelHandler {
         static inline int  ratio_state_pub_  = 1; 
         static inline int  ratio_config_pub_ = 100; // 0の時は初回のみ
         static inline int  ratio_error_pub_  = 100;
+        static inline int  ratio_mainloop_  = 100;
+        static inline int  width_log_ = 7;
         static inline bool use_slipt_write_ = false;
         static inline bool use_slipt_read_  = false;
         static inline bool use_fast_read_   = false;
-        static inline int  varbose_mainloop_  = false;
         static inline bool varbose_callback_  = false;
         static inline bool varbose_write_cmd_ = false;
         static inline bool varbose_write_cfg_ = false;
@@ -132,7 +136,6 @@ class DynamixelHandler {
         static inline bool varbose_read_hwerr_   = false;
         static inline bool varbose_read_cfg_     = false;
         static inline bool varbose_read_cfg_err_ = false;
-        static inline int  width_log_ = 7;
 
         //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
@@ -275,7 +278,6 @@ const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が�
 using std::setw;
 using std::prev;
 using std::next;
-using std::min;
 
 static string control_table_layout(int width, const map<uint8_t, vector<int64_t>>& id_data_map, const vector<DynamixelAddress>& dp_list, const string& header=""){
     std::stringstream ss;
