@@ -179,7 +179,7 @@ void DynamixelHandler::SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_c
     //id_cmd_vec_mapの中身を確認
     if ( varbose_write_cmd_ ) {
         char header[100]; sprintf(header, "[%d] servo(s) will be written", (int)id_cmd_vec_map.size());
-        auto ss = control_table_layout(id_cmd_vec_map, target_cmd_dp_list, string(header));
+        auto ss = control_table_layout(width_log_, id_cmd_vec_map, target_cmd_dp_list, string(header));
         ROS_INFO_STREAM(ss);
     }
     dyn_comm_.SyncWrite(target_cmd_dp_list, id_cmd_vec_map);
@@ -222,7 +222,7 @@ bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_st
     // id_st_vec_mapの中身を確認
     if ( varbose_read_st_ ) if ( id_st_vec_map.size()>0 ) {
         char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_st_vec_map.size());
-        auto ss = control_table_layout(id_st_vec_map, target_state_dp_list, string(header));
+        auto ss = control_table_layout(width_log_, id_st_vec_map, target_state_dp_list, string(header));
         ROS_INFO_STREAM(ss);
         if (has_any_hardware_error_) ROS_WARN("Hardware Error are detected");
     }
@@ -320,7 +320,7 @@ bool DynamixelHandler::SyncReadCfgParams_Limit(){
     // id_limit_vec_mapの中身を確認
     if ( varbose_read_cfg_ ) if ( id_limit_vec_map.size()>0 ) {
         char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_limit_vec_map.size());
-        auto ss = control_table_layout(id_limit_vec_map, cfg_limit_dp_list, string(header));
+        auto ss = control_table_layout(width_log_, id_limit_vec_map, cfg_limit_dp_list, string(header));
         ROS_INFO_STREAM(ss);
     }
 

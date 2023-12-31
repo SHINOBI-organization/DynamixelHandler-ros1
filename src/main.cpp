@@ -53,13 +53,14 @@ bool DynamixelHandler::Initialize(){
     // return TmpTest();
 
     // main loop の設定
-    if (!nh_p.getParam("loop_rate",        loop_rate_ )) loop_rate_ =  50;
+    if (!nh_p.getParam("loop_rate",        loop_rate_ ))        loop_rate_ =  50;
     if (!nh_p.getParam("ratio_state_read",  ratio_state_pub_ )) ratio_state_pub_  =  1;
     if (!nh_p.getParam("ratio_config_read", ratio_config_pub_)) ratio_config_pub_ =  0;
     if (!nh_p.getParam("ratio_error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
     if (!nh_p.getParam("use_slipt_write", use_slipt_write_)) use_slipt_write_   =  false;
     if (!nh_p.getParam("use_slipt_read",  use_slipt_read_ )) use_slipt_read_   =  false;
-    if (!nh_p.getParam("use_fast_read",   use_fast_read_  )) use_fast_read_    =  true;    
+    if (!nh_p.getParam("use_fast_read",   use_fast_read_  )) use_fast_read_    =  true;
+    if (!nh_p.getParam("max_log_width",    width_log_)) width_log_ = 7;
     if (!nh_p.getParam("varbose_write_cmd", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
     if (!nh_p.getParam("varbose_write_cfg", varbose_write_cfg_ )) varbose_write_cfg_ =  false;
     if (!nh_p.getParam("varbose_read_st",     varbose_read_st_     )) varbose_read_st_     =  false;
@@ -70,6 +71,7 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("varbose_callback", varbose_callback_ )) varbose_callback_  =  false;
     if (!nh_p.getParam("varbose_mainloop", varbose_mainloop_ )) varbose_mainloop_  =  false;
     bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
+
 
     // id_listの作成
     int num_expexted, id_max; 

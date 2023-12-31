@@ -132,6 +132,7 @@ class DynamixelHandler {
         static inline bool varbose_read_hwerr_   = false;
         static inline bool varbose_read_cfg_     = false;
         static inline bool varbose_read_cfg_err_ = false;
+        static inline int  width_log_ = 7;
 
         //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
@@ -271,28 +272,41 @@ const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が�
     };
 } // namespace dyn_p
 
-static string control_table_layout(const map<uint8_t, vector<int64_t>>& id_data_map, const vector<DynamixelAddress>& dp_list, const string& header=""){
+using std::setw;
+using std::prev;
+using std::next;
+using std::min;
+
+static string control_table_layout(int width, const map<uint8_t, vector<int64_t>>& id_data_map, const vector<DynamixelAddress>& dp_list, const string& header=""){
     std::stringstream ss;
-    ss << header << "\n";
-    ss << " ID :"; for (const auto& pair : id_data_map) 
-                        ss << "  [" << std::setw(3) << (int)pair.first << "] "; ss << "\n";
+    ss << header;
+    if (id_data_map.empty()) return ss.str();
+
+	width = min(width, (int)id_data_map.size());
+    map<uint8_t, vector<int64_t>> first(id_data_map.begin(), prev(id_data_map.end(), id_data_map.size() - width));
+    map<uint8_t, vector<int64_t>> second(next(id_data_map.begin(), width), id_data_map.end());
+
+    ss << "\n" << " ID :"; 
+    for (const auto& [id, data] : first)         
+        ss << "  [" << setw(3) << (int)id << "] "; ss << "\n";
     for (size_t i = 0; i < dp_list.size(); ++i) {
-        ss << "-" << std::setw(4) << dp_list[i].address() ;
-        for (const auto& pair : id_data_map)
-            ss << std::setw(7) << pair.second[i] << " "; ss << "\n";
+        ss << "-" << setw(4) << dp_list[i].address() ;
+        for (const auto& [id, data] : first)
+            ss << std::setfill(' ') << setw(7) << data[i] << " "; ss << "\n";
     }
-    return ss.str();
+    
+    return ss.str() + control_table_layout(width, second, dp_list);
 }
 
 static string id_list_layout(const vector<uint8_t>& id_list, const string& header=""){
     std::stringstream ss;
     ss << header << "\n";
-    ss << " ID :"; 
+    ss << " ID : ["; 
     for ( auto id : id_list ) {
-        ss << std::setw(3) << (int)id; 
+        ss << setw(2) << (int)id; 
         if ( id != id_list.back()) ss << ",";
     }
-    ss << "\n";
+    ss << "]";
     return ss.str();
 }
 
