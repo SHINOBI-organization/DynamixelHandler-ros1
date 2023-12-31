@@ -66,6 +66,7 @@ bool DynamixelHandler::Initialize(){
     if (!nh_p.getParam("varbose_read_st_err", varbose_read_st_err_ )) varbose_read_st_err_ =  false;
     if (!nh_p.getParam("varbose_read_hwerr",  varbose_read_hwerr_  )) varbose_read_hwerr_  =  false;
     if (!nh_p.getParam("varbose_read_cfg",    varbose_read_cfg_    )) varbose_read_cfg_    =  false;
+    if (!nh_p.getParam("varbose_read_cfg_err",varbose_read_cfg_err_)) varbose_read_cfg_err_=  false;
     if (!nh_p.getParam("varbose_callback", varbose_callback_ )) varbose_callback_  =  false;
     if (!nh_p.getParam("varbose_mainloop", varbose_mainloop_ )) varbose_mainloop_  =  false;
     bool tmp = false; !nh_p.getParam("varbose_mainloop", tmp ); varbose_mainloop_  += tmp; // varbose_mainloop_をintでもboolでも受け取れるようにする
@@ -88,8 +89,9 @@ bool DynamixelHandler::Initialize(){
     if ( SyncReadStateValues()     ) BroadcastDxlState();
     if ( SyncReadHardwareErrors()  ) BroadcastDxlError();
     if ( SyncReadCfgParams_Mode()  ) BroadcastDxlConfig_Mode();
-    if ( SyncReadCfgParams_Limit() ) BroadcastDxlConfig_Limit();
     if ( SyncReadCfgParams_Gain()  ) BroadcastDxlConfig_Gain();
+    while ( ros::ok() && cfg_param_limit_.size() != id_list_.size() ) SyncReadCfgParams_Limit(); // Limitは読み取れないとまずいので，確実に．
+        BroadcastDxlConfig_Limit();
 
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;

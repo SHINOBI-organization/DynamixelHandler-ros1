@@ -64,14 +64,15 @@
         <param name="use_slipt_write" value="true"/> <!-- 複数のアドレスへの書き込みを分割するか同時に行うか, trueでも速度的に変わらない -->
         
         <!-- デバック用 -->
-        <param name="varbose_mainloop"    value="100"/>
-        <param name="varbose_callback"    value="false"/>
-        <param name="varbose_write_cmd"   value="false"/>
-        <param name="varbose_write_cfg"   value="false"/>
-        <param name="varbose_read_st"     value="false"/>
-        <param name="varbose_read_st_err" value="false"/>
-        <param name="varbose_read_hwerr"  value="true"/>
-        <param name="varbose_read_cfg"    value="false"/>
+        <param name="varbose_mainloop"     value="100"/>
+        <param name="varbose_callback"     value="false"/>
+        <param name="varbose_write_cmd"    value="true"/>
+        <param name="varbose_write_cfg"    value="false"/>
+        <param name="varbose_read_st"      value="false"/>
+        <param name="varbose_read_st_err"  value="false"/>
+        <param name="varbose_read_hwerr"   value="true"/>
+        <param name="varbose_read_cfg"     value="true"/>
+        <param name="varbose_read_cfg_err" value="true"/>
     </node>
 
 </launch>

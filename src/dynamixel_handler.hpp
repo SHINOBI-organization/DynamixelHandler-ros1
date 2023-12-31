@@ -37,6 +37,7 @@ using std::set;
 #include <algorithm>
 using std::max_element;
 using std::min_element;
+using std::clamp;
 
 static const double DEG = M_PI/180.0; // degを単位に持つ数字に掛けるとradになる
 static double deg2rad(double deg){ return deg*DEG; }
@@ -127,10 +128,11 @@ class DynamixelHandler {
         static inline bool varbose_callback_  = false;
         static inline bool varbose_write_cmd_ = false;
         static inline bool varbose_write_cfg_ = false;
-        static inline bool varbose_read_st_     = false;
-        static inline bool varbose_read_st_err_ = false;
-        static inline bool varbose_read_hwerr_  = false;
-        static inline bool varbose_read_cfg_    = false;
+        static inline bool varbose_read_st_      = false;
+        static inline bool varbose_read_st_err_  = false;
+        static inline bool varbose_read_hwerr_   = false;
+        static inline bool varbose_read_cfg_     = false;
+        static inline bool varbose_read_cfg_err_ = false;
         //* Dynamixelとの通信
         static inline DynamixelComunicator dyn_comm_;
         //* Dynamixelを扱うための変数群 
@@ -160,6 +162,17 @@ class DynamixelHandler {
             ELECTRONICAL_SHOCK = 4,
             OVERLOAD           = 5,
         };
+        enum CfgParamIndex_Limit { // config_param_のIndex, サーボのCmd_valueの制限値
+            TEMPERATURE_LIMIT  = 0,
+            MAX_VOLTAGE_LIMIT  = 1,
+            MIN_VOLTAGE_LIMIT  = 2,
+            PWM_LIMIT          = 3,
+            CURRENT_LIMIT      = 4,
+            ACCELERATION_LIMIT = 5,
+            VELOCITY_LIMIT     = 6,
+            MAX_POSITION_LIMIT = 7,
+            MIN_POSITION_LIMIT = 8,
+        };
         // 連結したサーボの基本情報
         static inline vector<uint8_t> id_list_; // chained dynamixel id list
         static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
@@ -169,6 +182,7 @@ class DynamixelHandler {
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValueIndexに対応する
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStValueIndexに対応する
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHWErrIndexに対応する
+        static inline map<uint8_t, array<double,11>> cfg_param_limit_; // 各dynamixelの id と サーボのCmd_valueの制限値のマップ, 中身とIndexははCfgParamIndex_Limitに対応する 
         // 上記の変数を適切に使うための補助的なフラグ
         static inline map<uint8_t, Time> when_op_mode_updated_; // 
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
@@ -211,6 +225,17 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_input_voltage, 
         present_temperture    
     }; 
+const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が大事
+        temperature_limit ,
+        max_voltage_limit ,
+        min_voltage_limit ,
+        pwm_limit         ,
+        current_limit     ,
+        acceleration_limit,
+        velocity_limit    ,
+        max_position_limit,
+        min_position_limit,
+    };
 } // namespace dyn_x
 
 namespace dyn_p{
@@ -232,6 +257,42 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_input_voltage, 
         present_temperture    
     }; 
+const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が大事
+        temperature_limit ,
+        max_voltage_limit ,
+        min_voltage_limit ,
+        pwm_limit         ,
+        current_limit     ,
+        acceleration_limit,
+        velocity_limit    ,
+        max_position_limit,
+        min_position_limit,
+    };
 } // namespace dyn_p
+
+static string control_table_layout(const map<uint8_t, vector<int64_t>>& id_data_map, const vector<DynamixelAddress>& dp_list, const string& header=""){
+    std::stringstream ss;
+    ss << header << "\n";
+    ss << " ID :"; for (const auto& pair : id_data_map) 
+                        ss << "  [" << std::setw(3) << (int)pair.first << "] "; ss << "\n";
+    for (size_t i = 0; i < dp_list.size(); ++i) {
+        ss << "-" << std::setw(4) << dp_list[i].address() ;
+        for (const auto& pair : id_data_map)
+            ss << std::setw(7) << pair.second[i] << " "; ss << "\n";
+    }
+    return ss.str();
+}
+
+static string id_list_layout(const vector<uint8_t>& id_list, const string& header=""){
+    std::stringstream ss;
+    ss << header << "\n";
+    ss << " ID :"; 
+    for ( auto id : id_list ) {
+        ss << std::setw(3) << (int)id; 
+        if ( id != id_list.back()) ss << ",";
+    }
+    ss << "\n";
+    return ss.str();
+}
 
 #endif /* DYNAMIXEL_HANDLER_H_ */

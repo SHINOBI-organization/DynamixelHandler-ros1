@@ -30,6 +30,7 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 // 
 bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after){
     if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
+    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
 
     auto now_pos = ReadPresentPosition(id);
     int now_rot = (now_pos+M_PI) / (2*M_PI);
@@ -42,32 +43,35 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
     if( after == TORQUE_ENABLE ) TorqueOn(id);
 
     bool is_clear = ReadHardwareError(id) == 0b00000000;
-    if (is_clear) ROS_INFO ("ClearHardwareError: ID [%d] is cleared error", id);
-    else          ROS_ERROR("ClearHardwareError: ID [%d] failed to clear error", id);
+    if (is_clear) ROS_INFO ("ID [%d] is cleared error", id);
+    else          ROS_ERROR("ID [%d] failed to clear error", id);
     return is_clear;
 }
 
 bool DynamixelHandler::TorqueOn(uint8_t id){
+    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     // 角度の同期と速度の停止
     if ( !StopRotation(id) ) return false;//この処理が失敗すると危険なので，トルク入れない．
     // トルクを入れる
     WriteTorqueEnable(id, TORQUE_ENABLE);
     // 結果を確認
     bool is_enable = TORQUE_ENABLE == ReadTorqueEnable(id);
-    if ( !is_enable ) ROS_ERROR("TorqueOn: ID [%d] failed to enable torque", id);
+    if ( !is_enable ) ROS_ERROR("ID [%d] failed to enable torque", id);
     return is_enable;
 }
 
 bool DynamixelHandler::TorqueOff(uint8_t id){
+    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     // トルクを切る
     WriteTorqueEnable(id, TORQUE_DISABLE);
     // 結果を確認
     bool is_disable = TORQUE_DISABLE == ReadTorqueEnable(id);
-    if ( !is_disable ) ROS_ERROR("TorqueOff: ID [%d] failed to disable torque", id);
+    if ( !is_disable ) ROS_ERROR("ID [%d] failed to disable torque", id);
     return is_disable;
 }
 
 bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after){
+    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
     if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
     /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
@@ -78,14 +82,15 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     if ( is_changed ) {
         op_mode_[id] = mode;
         when_op_mode_updated_[id] = Time::now();
-        ROS_INFO("ChangeOperatingMode: ID [%d] is changed operating mode [%d]", id, mode);
+        ROS_INFO("ID [%d] is changed operating mode [%d]", id, mode);
     } else {
-        ROS_ERROR("ChangeOperatingMode: ID [%d] failed to change operating mode", id); 
+        ROS_ERROR("ID [%d] failed to change operating mode", id); 
     }
     return is_changed;
 }
 
 bool DynamixelHandler::StopRotation(uint8_t id){
+    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     auto now_pos = ReadPresentPosition(id);
     cmd_values_[id][GOAL_POSITION]      = now_pos;
     state_values_[id][PRESENT_POSITION] = now_pos;
@@ -156,26 +161,24 @@ void DynamixelHandler::SyncWriteCmdValues(const set<CmdValueIndex>& list_wirte_c
     if ( !(0 <= start && start <= end && end < cmd_dp_list.size()) ) return;
 
     vector<DynamixelAddress> target_cmd_dp_list;   // 書き込むコマンドのアドレスのベクタを作成
-    map<uint8_t, vector<int64_t>> id_data_vec_map; // id と 書き込むデータのベクタのマップを作成
+    map<uint8_t, vector<int64_t>> id_cmd_vec_map; // id と 書き込むデータのベクタのマップを作成
     // アドレスのベクタと，データのベクタの並びは対応している必要があるので，同一のループで作成する．
     for (int cmd = start; cmd <= end; cmd++) {
         const auto dp = cmd_dp_list[cmd];
         target_cmd_dp_list.push_back(dp); 
         for (auto id : id_list_) if ( series_[id]==SERIES_X ) {
             if ( !is_cmd_updated_[id] ) continue; // 更新されていない場合はスキップ
-            id_data_vec_map[id].push_back( dp.val2pulse( cmd_values_[id][cmd], model_[id]) );
+            id_cmd_vec_map[id].push_back( dp.val2pulse( cmd_values_[id][cmd], model_[id]) );
         }
     }
 
-    //id_data_vec_mapの中身を確認
+    //id_cmd_vec_mapの中身を確認
     if ( varbose_write_cmd_ ) {
-        ROS_INFO("SyncWriteCmdValues: %d servo(s) will be written", (int)id_data_vec_map.size());
-        for ( auto pair : id_data_vec_map ) {
-            ROS_INFO("  * servo id [%d] will be written", pair.first);
-            for ( auto data : pair.second ) ROS_INFO("    - %d", (int)data);
-        }
+        char header[100]; sprintf(header, "[%d] servo(s) will be written", (int)id_cmd_vec_map.size());
+        auto ss = control_table_layout(id_cmd_vec_map, target_cmd_dp_list, string(header));
+        ROS_INFO_STREAM(ss);
     }
-    dyn_comm_.SyncWrite(target_cmd_dp_list, id_data_vec_map);
+    dyn_comm_.SyncWrite(target_cmd_dp_list, id_cmd_vec_map);
 }
 
 /**
@@ -197,7 +200,7 @@ bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_st
     vector<uint8_t> target_id_list;
     for (auto id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
 
-    auto id_data_vec_map = (use_fast_read_) //  fast readを使う設定の場合はfast readを使う 途中で切り替えるとtimeout後に来るデータによってSyncReadが何度も失敗するので注意
+    auto id_st_vec_map = (use_fast_read_) //  fast readを使う設定の場合はfast readを使う 途中で切り替えるとtimeout後に来るデータによってSyncReadが何度も失敗するので注意
         ? dyn_comm_.SyncRead_fast(target_state_dp_list, target_id_list)
         : dyn_comm_.SyncRead     (target_state_dp_list, target_id_list);
     is_timeout_read_state_     = dyn_comm_.timeout_last_read();
@@ -206,31 +209,30 @@ bool DynamixelHandler::SyncReadStateValues(const set<StValueIndex>& list_read_st
 
     // 通信エラーの表示
     if ( varbose_read_st_err_ ) if ( has_comm_error_read_state_ || is_timeout_read_state_ ) {
-        ROS_WARN("SyncReadStateValues: %d servo(s) failed to read", (int)(target_id_list.size() - id_data_vec_map.size()));
-        for ( auto id : target_id_list )
-            if ( id_data_vec_map.find(id) == id_data_vec_map.end() ) 
-                ROS_WARN("  * servo id [%d] failed to read", id);
+        vector<uint8_t> failed_id_list;
+        for ( auto id : target_id_list ) if ( id_st_vec_map.find(id) == id_st_vec_map.end() ) failed_id_list.push_back(id);
+        char header[100]; sprintf(header, "[%d] servo(s) failed to read", (int)(target_id_list.size() - id_st_vec_map.size()));
+        auto ss = id_list_layout(failed_id_list, string(header) + (is_timeout_read_state_? " (time out)" : " (some kind packet error)"));
+        ROS_WARN_STREAM(ss);
     }
-    // id_data_vec_mapの中身を確認
-    if ( varbose_read_st_ ) {
-        ROS_INFO("SyncReadStateValues: %d servo(s) are read", (int)id_data_vec_map.size());
-        for ( auto pair : id_data_vec_map ) {
-            ROS_INFO("  * servo id [%d] is read", pair.first);
-            for ( auto data : pair.second ) ROS_INFO("    - %d", (int)data);
-        }
-        if (has_any_hardware_error_) ROS_WARN("SyncReadStateValues: Hardware Error are detected");
+    // id_st_vec_mapの中身を確認
+    if ( varbose_read_st_ ) if ( id_st_vec_map.size()>0 ) {
+        char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_st_vec_map.size());
+        auto ss = control_table_layout(id_st_vec_map, target_state_dp_list, string(header));
+        ROS_INFO_STREAM(ss);
+        if (has_any_hardware_error_) ROS_WARN("Hardware Error are detected");
     }
     // state_values_に反映
     for (int i = 0; i <= end-start; i++) {
         const auto dp = target_state_dp_list[i];
-        for (auto pair : id_data_vec_map) {
+        for (auto pair : id_st_vec_map) {
             const uint8_t id = pair.first;
             const int64_t data_int = pair.second[i];
             state_values_[id][start+i] = dp.pulse2val( data_int, model_[id]);
         }
     }
 
-    return id_data_vec_map.size()>0; // 1つでも成功したら成功とする.
+    return id_st_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
 void DynamixelHandler::SyncWriteCfgParams_Mode(){
@@ -274,7 +276,7 @@ bool DynamixelHandler::SyncReadHardwareErrors(){
 
     // コンソールへの表示
     if ( varbose_read_hwerr_ ) {
-        ROS_WARN("SyncReadHardwareError: Hardware error are Checked");
+        ROS_WARN("Hardware error are Checked");
         for (auto id : target_id_list) {
             if (hardware_error_[id][INPUT_VOLTAGE     ]) ROS_ERROR(" * servo id [%d] has INPUT_VOLTAGE error",      id);
             if (hardware_error_[id][MOTOR_HALL_SENSOR ]) ROS_ERROR(" * servo id [%d] has MOTOR_HALL_SENSOR error",  id);
@@ -296,7 +298,39 @@ bool DynamixelHandler::SyncReadCfgParams_Gain(){
 }
 
 bool DynamixelHandler::SyncReadCfgParams_Limit(){
-    return false;
+    vector<uint8_t> target_id_list;
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
+
+    auto id_limit_vec_map = dyn_comm_.SyncRead_fast(cfg_limit_dp_list, target_id_list);   
+    bool is_timeout_read     = dyn_comm_.timeout_last_read();
+    bool has_comm_error_read = dyn_comm_.comm_error_last_read();
+
+    // 通信エラーの表示
+    if ( varbose_read_cfg_err_ ) if ( has_comm_error_read || is_timeout_read ) {
+        vector<uint8_t> failed_id_list;
+        for ( auto id : target_id_list ) if ( id_limit_vec_map.find(id) == id_limit_vec_map.end() ) failed_id_list.push_back(id);
+        char header[100]; sprintf(header, "[%d] servo(s) failed to read", (int)(target_id_list.size() - id_limit_vec_map.size()));
+        auto ss = id_list_layout(failed_id_list, string(header) + (is_timeout_read_state_? " (time out)" : " (some kind packet error)"));
+        ROS_WARN_STREAM(ss);
+    }
+    // id_limit_vec_mapの中身を確認
+    if ( varbose_read_cfg_ ) if ( id_limit_vec_map.size()>0 ) {
+        char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_limit_vec_map.size());
+        auto ss = control_table_layout(id_limit_vec_map, cfg_limit_dp_list, string(header));
+        ROS_INFO_STREAM(ss);
+    }
+
+    // cfg_param_limit_に反映
+    for ( auto cfg_lim=0; cfg_lim<cfg_limit_dp_list.size(); cfg_lim++) {
+        DynamixelAddress dp = cfg_limit_dp_list[cfg_lim];
+        for (auto pair : id_limit_vec_map) {
+            const uint8_t id = pair.first;
+            const int64_t data_int = pair.second[cfg_lim];
+            cfg_param_limit_[id][cfg_lim] = dp.pulse2val( data_int, model_[id]);
+        }
+    }
+
+    return id_limit_vec_map.size()>0; // 1つでも成功したら成功とする.
 }
 
 //* ROS関係
@@ -325,7 +359,8 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto pos = msg.position__deg[i];
-        cmd_values_[id][GOAL_POSITION] = deg2rad(pos);
+        auto limit = cfg_param_limit_[id];
+        cmd_values_[id][GOAL_POSITION] = clamp(deg2rad(pos), limit[MIN_POSITION_LIMIT], limit[MAX_POSITION_LIMIT]);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_POSITION);
@@ -340,7 +375,8 @@ void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::Dy
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto vel = msg.velocity__deg_s[i];
-        cmd_values_[id][GOAL_VELOCITY] = deg2rad(vel);
+        auto limit = cfg_param_limit_[id];
+        cmd_values_[id][GOAL_VELOCITY] = clamp(deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT]);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_VELOCITY);
         ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
@@ -355,7 +391,8 @@ void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::Dyn
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
         auto cur = msg.current__mA[i];
-        cmd_values_[id][GOAL_CURRENT] = cur;
+        auto limit = cfg_param_limit_[id];
+        cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
         is_cmd_updated_[id] = true;
         list_wirte_cmd_.insert(GOAL_CURRENT);
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
@@ -371,17 +408,18 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
 
     for (int i = 0; i < msg.id_list.size(); i++) {
         int id = msg.id_list[i];
+        auto limit = cfg_param_limit_[id];
         if ( do_process_pos ){
             auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
             auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
             is_cmd_updated_[id] = true;
-            cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
+            cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
             list_wirte_cmd_.insert(GOAL_POSITION);
         }
         if ( do_process_cur ){
             auto cur = msg.current__mA[i];
             is_cmd_updated_[id] = true;
-            cmd_values_[id][GOAL_CURRENT] = cur;
+            cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
             list_wirte_cmd_.insert(GOAL_CURRENT);
         }
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
@@ -400,7 +438,7 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
         auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
         auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
         is_cmd_updated_[id] = true;
-        cmd_values_[id][GOAL_POSITION] = deg2rad(pos + rot * 360.0);
+        cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
         list_wirte_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
     }
