@@ -15,10 +15,14 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
    - 指定した周期でハードウェアエラーを error topic としてpub (デフォルト: 0.5Hz)
    - subした command topic に合わせて制御モードを自動で変更 (電流/速度/位置/電流制限付き位置/拡張位置制御に対応)
    - sub/pubされる情報はパルス値ではなく物理量
- - Serial通信の Raed/Write は ROS node の周期と同期
+ - 比較的高速なRead/Writeを実現 (12サーボに電流/速度/位置を Read/Write しても150Hzくらい)
+   - 複数のアドレスを一括で読み書き & 複数のサーボを同時に読み書き(SyncRead/SyncWrite) によって Read 回数を抑える
+   - Fast Sync Read インストラクションを活用して Read を高速化
+   - Raed/Write は ROS node の周期と同期しているので，topicのcallbackに左右されない．
+   - ※ 適切な`LATENCY_TIMER`の設定が必要
  - node を kill したタイミングで動作を停止
  - 初期化時にエラーを自動でクリア
- - エラークリア時の回転数消失問題をhoming offsetにより自動補正
+ - エラークリア時の回転数消失問題を homing offset により自動補正
  - ros param から各種 log 表示の制御が可能
    - Serial通信のエラー率
    - Serial通信の Read/Write にかかる平均時間
@@ -28,6 +32,16 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
   
 ### 未実装機能
  - 精度に合わせてpubする値を丸める
+ - profile_velocity_とprofile_accelerationを command topic から設定できるようにする
+ - 各種のlimitをsub/pubできるようにする
+ - 各種のgainをsub/pubできるようにする
+ - 各種のmodeをsub/pubできるようにする
+ - commnad topic を service にする
+ - baudrate を統一し一括変更できる sub node を作成する
+ - 電流/速度制御時に通信が途切れたら自動で停止するようにする
+ - External Portsをうまいことやる
+ - free command topic の対応を増やす
+ - free state topic として，ユーザー定義のアドレスの値を監視できるようにする
      
 ## how to install
 
@@ -305,7 +319,7 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
  - drive_mode             : 未実装，現在値を`/dynamixel/config/mode/r`としてpubできるにようにする．    
                             未実装，`/dynamixel/config/mode/w`をsubして設定されるようにする．
  - homing_offset          : ユーザーは使用不可，reboot時の角度補正に用いられる．
- - bus_watchbdog          : 未実装，velocity control時に一定時間通信切れで自動停止するようにする．
+ - bus_watchbdog          : 未実装，current/velocity control時に一定時間通信切れで自動停止するようにする．
 
 ### その他
  - moving_threshold       : not support
