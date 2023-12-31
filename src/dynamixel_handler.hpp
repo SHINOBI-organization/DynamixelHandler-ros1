@@ -179,12 +179,12 @@ class DynamixelHandler {
         static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
         // 連結しているサーボの個々の状態を保持するmap
         static inline map<uint8_t, uint8_t> op_mode_; // 各dynamixelの id と 制御モード のマップ
-        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身とIndexははCmdValueIndexに対応する
-        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身とIndexははStValueIndexに対応する
-        static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身とIndexははHWErrIndexに対応する
-        static inline map<uint8_t, array<double,11>> cfg_param_limit_; // 各dynamixelの id と サーボのCmd_valueの制限値のマップ, 中身とIndexははCfgParamIndex_Limitに対応する 
+        static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身の並びはCmdValueIndexに対応する
+        static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身の並びはStValueIndexに対応する
+        static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身の並びはHWErrIndexに対応する
+        static inline map<uint8_t, array<double,11>> cfg_param_limit_; // 各dynamixelの id と サーボの各種制限値のマップ, 中身の並びはCfgParamIndex_Limitに対応する 
         // 上記の変数を適切に使うための補助的なフラグ
-        static inline map<uint8_t, Time> when_op_mode_updated_; // 
+        static inline map<uint8_t, Time> when_op_mode_updated_; // 各dynamixelの id と op_mode_ が更新された時刻のマップ
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
         static inline bool has_any_hardware_error_    = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
         static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
@@ -207,7 +207,7 @@ class DynamixelHandler {
 };
 
 namespace dyn_x{
-const static vector<DynamixelAddress> cmd_dp_list = { // この順序が大事
+const static vector<DynamixelAddress> cmd_dp_list = { // この順序が大事，CmdValueIndexと対応
         goal_pwm            ,
         goal_current        ,
         goal_velocity       ,
@@ -215,7 +215,7 @@ const static vector<DynamixelAddress> cmd_dp_list = { // この順序が大事
         profile_velocity    ,
         goal_position       
     };
-const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
+const static vector<DynamixelAddress> state_dp_list = { // この順序が大事，StValueIndexと対応
         present_pwm, 
         present_current, 
         present_velocity, 
@@ -225,7 +225,7 @@ const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
         present_input_voltage, 
         present_temperture    
     }; 
-const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が大事
+const static vector<DynamixelAddress> cfg_limit_dp_list = { // この順序が大事，CfgParamIndex_Limitと対応
         temperature_limit ,
         max_voltage_limit ,
         min_voltage_limit ,
