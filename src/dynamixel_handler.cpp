@@ -78,7 +78,7 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
     if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
     /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
-    /* モードを変更 */    WriteOperatingMode(id, mode);
+    /* モードを変更 */    WriteOperatingMode(id, mode);  // Operating Modeを変えると，RAM値が全部デフォルトに戻るっぽい．
     /* トルクを戻す */    WriteTorqueEnable(id, after);  // 動作中にこの関数が呼ばれることも考えて, TorqueOnは使わない
     // 結果を確認
     bool is_changed = mode == ReadOperatingMode(id);
@@ -95,13 +95,15 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
 // モータの動作を停止させる．
 bool DynamixelHandler::StopRotation(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    auto cur_lim = option_limit_[id][CURRENT_LIMIT];
     auto now_pos = ReadPresentPosition(id);
     cmd_values_[id][GOAL_POSITION]      = now_pos;
     state_values_[id][PRESENT_POSITION] = now_pos;
-    if ( !WriteGoalPosition(id, now_pos) ) return false; 
-    if ( !WriteGoalVelocity(id, 0.0)     ) return false;
-    if ( !WriteGoalCurrent(id, cur_lim/5)) return false; // continuous torque は stall torque のだいたい　20%
+    auto cur_lim = option_limit_[id][CURRENT_LIMIT];
+    auto now_cur = cmd_values_[id][GOAL_CURRENT];
+    auto cur = clamp(now_cur, -cur_lim/5, cur_lim/5); // ストールトルクの20%まで制限
+    if ( !WriteGoalPosition(id, now_pos)) return false; 
+    if ( !WriteGoalVelocity(id, 0.0)    ) return false;
+    if ( !WriteGoalCurrent (id, cur    )) return false;
     return true;
 }
 
@@ -162,34 +164,44 @@ bool DynamixelHandler::WriteOperatingMode(uint8_t id, uint8_t mode){
 /**
  * @func SyncWriteCommandValues
  * @brief 指定した範囲のコマンド値を書き込む
- * @param list_wirte_cmd 書き込むコマンドのEnumのリスト
+ * @param list_write_cmd 書き込むコマンドのEnumのリスト
 */
-void DynamixelHandler::SyncWriteCommandValues(CmdValueIndex target){ set<CmdValueIndex> t = {target} ; return SyncWriteCommandValues(t);} 
-void DynamixelHandler::SyncWriteCommandValues(const set<CmdValueIndex>& list_wirte_cmd){
-    if ( list_wirte_cmd.empty() ) return; // 空なら何もしない
-    const CmdValueIndex start = *min_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
-    const CmdValueIndex end   = *max_element(list_wirte_cmd.begin(), list_wirte_cmd.end());
-    if ( !(0 <= start && start <= end && end < cmd_dp_list.size()) ) return;
-
-    vector<DynamixelAddress> target_cmd_dp_list;   // 書き込むコマンドのアドレスのベクタを作成
-    map<uint8_t, vector<int64_t>> id_cmd_vec_map; // id と 書き込むデータのベクタのマップを作成
-    // アドレスのベクタと，データのベクタの並びは対応している必要があるので，同一のループで作成する．
-    for (int cmd = start; cmd <= end; cmd++) {
+void DynamixelHandler::SyncWriteCommandValues(set<CmdValueIndex>& list_write_cmd){
+    // 空なら即時return
+    if ( list_write_cmd.empty() ) return;
+    // 書き込む範囲のイテレータを取得
+    const auto it_start = min_element(list_write_cmd.begin(), list_write_cmd.end());
+          auto it_end   = max_element(list_write_cmd.begin(), list_write_cmd.end());
+    // 分割書き込みが有効な場合を再帰で実装するため, 書き込む範囲を1つ目のみに制限
+    if ( use_split_write_ ) it_end = it_start;
+    // 書き込む範囲の値(cmd_dp_listのIndex)を取得, ここで読み取らないとeraseで消えてしまう
+    const CmdValueIndex cmd_start = *it_start, cmd_end = *it_end;
+    // 今回で書き込む範囲は削除, use_split_write_=falseの場合は全て削除, trueの場合は先頭だけ削除
+    list_write_cmd.erase(it_start, ++it_end);
+    // 書き込みに必要な変数を用意
+    vector<DynamixelAddress> target_cmd_dp_list;  // 書き込むコマンドのアドレスのベクタ
+    map<uint8_t, vector<int64_t>> id_cmd_vec_map; // id と 書き込むデータのベクタのマップ
+    for (size_t cmd = cmd_start; cmd <= cmd_end; cmd++) { // アドレスのベクタと，データのベクタの並びは対応している必要があるので，同一のループで作成する．
         const auto dp = cmd_dp_list[cmd];
         target_cmd_dp_list.push_back(dp); 
         for (auto id : id_list_) if ( series_[id]==SERIES_X ) {
             if ( !is_cmd_updated_[id] ) continue; // 更新されていない場合はスキップ
-            id_cmd_vec_map[id].push_back( dp.val2pulse( cmd_values_[id][cmd], model_[id]) );
+            const auto pulse  = dp.val2pulse( cmd_values_[id][cmd], model_[id]);
+            id_cmd_vec_map[id].push_back( pulse );
         }
     }
-
     //id_cmd_vec_mapの中身を確認
     if ( varbose_write_cmd_ ) {
         char header[100]; sprintf(header, "[%d] servo(s) will be written", (int)id_cmd_vec_map.size());
         auto ss = control_table_layout(width_log_, id_cmd_vec_map, target_cmd_dp_list, string(header));
         ROS_INFO_STREAM(ss);
     }
+    // SyncWriteでまとめて書き込み
     dyn_comm_.SyncWrite(target_cmd_dp_list, id_cmd_vec_map);
+    // 分割書き込みのための再帰的な処理, list_write_cmdが空ならすぐ帰ってくる
+    SyncWriteCommandValues(list_write_cmd);
+    // 後処理，再帰の終端で実行される
+    is_cmd_updated_.clear();
 }
 
 /**
@@ -364,7 +376,7 @@ void DynamixelHandler::CallBackDxlCommand_Profile(const dynamixel_handler::Dynam
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Position"); // msg.id_listと同じサイズの奴だけ処理する
+    if (varbose_callback_) ROS_INFO("msg generate time: %f", msg.stamp.toSec());  // ↓msg.id_listと同じサイズの奴だけ処理する
     if ( msg.id_list.size() != msg.position__deg.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
     for (int i = 0; i < msg.id_list.size(); i++) {
@@ -373,7 +385,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
         auto limit = option_limit_[id];
         cmd_values_[id][GOAL_POSITION] = clamp(deg2rad(pos), limit[MIN_POSITION_LIMIT], limit[MAX_POSITION_LIMIT]);
         is_cmd_updated_[id] = true;
-        list_wirte_cmd_.insert(GOAL_POSITION);
+        list_write_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_POSITION);
     }
     if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
@@ -389,7 +401,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::Dy
         auto limit = option_limit_[id];
         cmd_values_[id][GOAL_VELOCITY] = clamp(deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT]);
         is_cmd_updated_[id] = true;
-        list_wirte_cmd_.insert(GOAL_VELOCITY);
+        list_write_cmd_.insert(GOAL_VELOCITY);
         ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
     }
     if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_velocity are updated", (int)msg.id_list.size());
@@ -405,7 +417,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::Dyn
         auto limit = option_limit_[id];
         cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
         is_cmd_updated_[id] = true;
-        list_wirte_cmd_.insert(GOAL_CURRENT);
+        list_write_cmd_.insert(GOAL_CURRENT);
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
     }
     if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_current are updated", (int)msg.id_list.size());
@@ -425,13 +437,13 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
             auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
-            list_wirte_cmd_.insert(GOAL_POSITION);
+            list_write_cmd_.insert(GOAL_POSITION);
         }
         if ( do_process_cur ){
             auto cur = msg.current__mA[i];
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
-            list_wirte_cmd_.insert(GOAL_CURRENT);
+            list_write_cmd_.insert(GOAL_CURRENT);
         }
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
     }
@@ -450,7 +462,7 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
         auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
         is_cmd_updated_[id] = true;
         cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
-        list_wirte_cmd_.insert(GOAL_POSITION);
+        list_write_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
     }
     if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());

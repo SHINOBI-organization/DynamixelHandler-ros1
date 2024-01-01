@@ -58,8 +58,8 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     if (!nh_p.getParam("ratio/error_read",  ratio_error_pub_ )) ratio_error_pub_  =  100;
     if (!nh_p.getParam("ratio/varbose_loop", ratio_mainloop_ )) ratio_mainloop_   =  100;
     if (!nh_p.getParam("max_log_width",      width_log_      )) width_log_        = 7;
-    if (!nh_p.getParam("use/slipt_write", use_slipt_write_)) use_slipt_write_ =  false;
-    if (!nh_p.getParam("use/slipt_read",  use_slipt_read_ )) use_slipt_read_  =  false;
+    if (!nh_p.getParam("use/split_write", use_split_write_)) use_split_write_ =  false;
+    if (!nh_p.getParam("use/split_read",  use_split_read_ )) use_split_read_  =  false;
     if (!nh_p.getParam("use/fast_read",   use_fast_read_  )) use_fast_read_   =  true;
     if (!nh_p.getParam("varbose/callback",     varbose_callback_  )) varbose_callback_  =  false;
     if (!nh_p.getParam("varbose/write_commad", varbose_write_cmd_ )) varbose_write_cmd_ =  false;
@@ -99,6 +99,8 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION, TORQUE_DISABLE);
+        dyn_comm_.tryWrite(profile_acceleration, id, 10);
+        dyn_comm_.tryWrite(profile_velocity, id, 10);
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
         if ( do_torque_on )   TorqueOn(id);
     }
@@ -148,12 +150,7 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 /* 処理時間時間の計測 */ auto wstart = system_clock::now();
 
     //* topicをSubscribe & Dynamixelへ目標角をWrite
-    if ( !use_slipt_write_ ) 
-        SyncWriteCommandValues(list_wirte_cmd_);
-    else for (auto each_cmd : list_wirte_cmd_) 
-        SyncWriteCommandValues(each_cmd); 
-    is_cmd_updated_.clear();
-    list_wirte_cmd_.clear();
+    SyncWriteCommandValues();
 
 /* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 
@@ -164,7 +161,7 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     if ( ratio_state_pub_!=0 ) 
     if ( !is_st_suc || cnt % ratio_state_pub_ == 0 ) { //直前が失敗している場合 or ratio_state_pub_の割合で実行
         is_st_suc = false;
-        if ( !use_slipt_read_ ) 
+        if ( !use_split_read_ ) 
             is_st_suc  = SyncReadStateValues(list_read_state_);
         else for (auto each_state : list_read_state_) 
             is_st_suc += SyncReadStateValues(each_state);
@@ -193,8 +190,8 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     //* デバック
     if ( ratio_mainloop_ !=0 ) 
     if ( cnt % ratio_mainloop_ == 0) {
-        float partial_suc = 100*suc_read_part/num_st_read;float full_suc    = 100*suc_read_full/num_st_read;
-        char msg[100]; sprintf(msg, "Loop [%d]: read=%.2f ms, write=%.2f ms, success=%0.1f%%(%0.1f%%)",
+        float partial_suc = 100*suc_read_part/num_st_read; float full_suc = 100*suc_read_full/num_st_read;
+        char msg[100]; sprintf(msg, "Loop [%d]: read=%.2fms write=%.2fms success=%.0f%%(%.0f%%)",
                                 cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, partial_suc, full_suc);
         if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
         /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 

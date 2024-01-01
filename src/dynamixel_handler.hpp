@@ -127,8 +127,8 @@ class DynamixelHandler {
         static inline int  ratio_error_pub_  = 100;
         static inline int  ratio_mainloop_  = 100;
         static inline int  width_log_ = 7;
-        static inline bool use_slipt_write_ = false;
-        static inline bool use_slipt_read_  = false;
+        static inline bool use_split_write_ = false;
+        static inline bool use_split_read_  = false;
         static inline bool use_fast_read_   = false;
         static inline bool varbose_callback_  = false;
         static inline bool varbose_write_cmd_ = false;
@@ -197,11 +197,10 @@ class DynamixelHandler {
         static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
         static inline bool is_timeout_read_state_     = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
         // 各周期で実行するserial通信の内容を決めるためのset
-        static inline set<CmdValueIndex> list_wirte_cmd_  = {};
+        static inline set<CmdValueIndex> list_write_cmd_  = {};
         static inline set<StValueIndex>  list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
         //* 連結しているDynamixelに一括で読み書きする関数
-        static void SyncWriteCommandValues(CmdValueIndex target);
-        static void SyncWriteCommandValues(const set<CmdValueIndex>& list_wirte_cmd=list_wirte_cmd_);
+        static void SyncWriteCommandValues(set<CmdValueIndex>& list_wirte_cmd=list_write_cmd_);
         static void SyncWriteOption_Mode();  // todo 
         static void SyncWriteOption_Gain();  // todo 
         static void SyncWriteOption_Limit(); // todo 
