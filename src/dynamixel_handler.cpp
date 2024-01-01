@@ -36,9 +36,10 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
     int now_rot = (now_pos+M_PI) / (2*M_PI);
     if (now_pos < -M_PI) now_rot--;
 
-    dyn_comm_.Reboot(id);
+    dyn_comm_.Reboot(id); //! RAMのデータが消えるので注意
     sleep_for(0.5s);
 
+    // WriteGains(id, opt_gain_[id]);
     WriteHomingOffset(id, now_rot*(2*M_PI));
     if( after == TORQUE_ENABLE ) TorqueOn(id);
 
@@ -46,6 +47,28 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
     if (is_clear) ROS_INFO ("ID [%d] is cleared error", id);
     else          ROS_ERROR("ID [%d] failed to clear error", id);
     return is_clear;
+}
+
+// モータの動作モードを変更する．連続で変更するときは1秒のインターバルを入れる
+bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after){
+    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
+    if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
+    if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
+    /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
+    /* モードを変更 */    WriteOperatingMode(id, mode);  //! RAMのデータが消えるので注意, Gain値のデフォルトも変わる．面倒な．．．
+    /* ゲインを戻す */   // WriteGains(id, opt_gain_[id]);
+    /* Profileを戻す*/  WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);
+    /* トルクを戻す */    WriteTorqueEnable(id, after);  // 動作中にこの関数が呼ばれることも考えて, TorqueOnは使わない
+    // 結果を確認
+    bool is_changed = mode == ReadOperatingMode(id);
+    if ( is_changed ) {
+        op_mode_[id] = mode;
+        when_op_mode_updated_[id] = Time::now();
+        ROS_INFO("ID [%d] is changed operating mode [%d]", id, mode);
+    } else {
+        ROS_ERROR("ID [%d] failed to change operating mode", id); 
+    }
+    return is_changed;
 }
 
 // モータを停止させてからトルクを入れる．
@@ -72,26 +95,6 @@ bool DynamixelHandler::TorqueOff(uint8_t id){
     return is_disable;
 }
 
-// モータの動作モードを変更する．連続で変更するときは1秒のインターバルを入れる
-bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after){
-    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
-    if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
-    /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
-    /* モードを変更 */    WriteOperatingMode(id, mode);  // Operating Modeを変えると，RAM値が全部デフォルトに戻るっぽい．
-    /* トルクを戻す */    WriteTorqueEnable(id, after);  // 動作中にこの関数が呼ばれることも考えて, TorqueOnは使わない
-    // 結果を確認
-    bool is_changed = mode == ReadOperatingMode(id);
-    if ( is_changed ) {
-        op_mode_[id] = mode;
-        when_op_mode_updated_[id] = Time::now();
-        ROS_INFO("ID [%d] is changed operating mode [%d]", id, mode);
-    } else {
-        ROS_ERROR("ID [%d] failed to change operating mode", id); 
-    }
-    return is_changed;
-}
-
 // モータの動作を停止させる．
 bool DynamixelHandler::StopRotation(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
@@ -100,7 +103,7 @@ bool DynamixelHandler::StopRotation(uint8_t id){
     state_values_[id][PRESENT_POSITION] = now_pos;
     auto cur_lim = option_limit_[id][CURRENT_LIMIT];
     auto now_cur = cmd_values_[id][GOAL_CURRENT];
-    auto cur = clamp(now_cur, -cur_lim/5, cur_lim/5); // ストールトルクの20%まで制限
+    auto cur = clamp(now_cur, -cur_lim/10, cur_lim/10); // ストールトルクの10%まで制限
     if ( !WriteGoalPosition(id, now_pos)) return false; 
     if ( !WriteGoalVelocity(id, 0.0)    ) return false;
     if ( !WriteGoalCurrent (id, cur    )) return false;
@@ -155,9 +158,29 @@ uint8_t DynamixelHandler::ReadOperatingMode(uint8_t id){
     return dyn_comm_.tryRead(operating_mode, id);
 }
 
-bool DynamixelHandler::WriteOperatingMode(uint8_t id, uint8_t mode){
-    return dyn_comm_.tryWrite(operating_mode, id, mode);
+bool DynamixelHandler::WriteOperatingMode(uint8_t id, uint8_t mode){ 
+    return dyn_comm_.tryWrite(operating_mode, id, mode); 
 }
+
+bool DynamixelHandler::WriteProfiles(uint8_t id, double acc, double vel){
+    auto vel_pulse = profile_velocity.val2pulse(vel, model_[id]);
+    auto acc_pulse = profile_acceleration.val2pulse(acc, model_[id]);
+    return dyn_comm_.tryWrite(profile_velocity, id, vel_pulse)
+        && dyn_comm_.tryWrite(profile_acceleration, id, acc_pulse);
+}
+
+// bool DynamixelHandler::WriteGains(uint8_t id, array<int64_t, 7> gains){
+    // if ( gains.size() != 8 ) return false;
+    // bool is_success = true;
+    // is_success &= dyn_comm_.tryWrite(velocity_i_gain, id, gains[0]);
+    // is_success &= dyn_comm_.tryWrite(velocity_p_gain, id, gains[1]);
+    // is_success &= dyn_comm_.tryWrite(position_d_gain, id, gains[2]);
+    // is_success &= dyn_comm_.tryWrite(position_i_gain, id, gains[3]);
+    // is_success &= dyn_comm_.tryWrite(position_p_gain, id, gains[4]);
+    // is_success &= dyn_comm_.tryWrite(feedforward_acc_gain, id, gains[5]);
+    // is_success &= dyn_comm_.tryWrite(feedforward_vel_gain, id, gains[6]);
+    // return is_success;
+// }
 
 //* Main loop 内で使う全モータへの一括読み書き関数たち
 

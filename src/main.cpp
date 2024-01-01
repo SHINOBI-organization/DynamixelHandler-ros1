@@ -86,11 +86,11 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     }
 
     // 最初の一回は全ての情報をread & publish
-    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ); BroadcastDxlState();
-    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ); BroadcastDxlError();
-    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ); BroadcastDxlOption_Limit();
-    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ); BroadcastDxlOption_Gain();
-    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ); BroadcastDxlOption_Mode();
+    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlState();
+    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlError();
+    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlOption_Limit();
+    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlOption_Gain();
+    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlOption_Mode();
 
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;
@@ -99,6 +99,7 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
         if ( do_torque_on )   TorqueOn(id);
+        WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/);
     }
 
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
@@ -196,6 +197,7 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 void DynamixelHandler::Terminate(int sig){
     ROS_INFO("Terminating DynamixelHandler ...");
     ros::shutdown();
+    dyn_comm_.set_retry_config(200, 5); // retryの設定を変更
     for(auto id : id_list_) StopRotation(id);
 }
 
