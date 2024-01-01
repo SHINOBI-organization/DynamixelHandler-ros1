@@ -170,18 +170,14 @@ void DynamixelHandler::SyncWriteCommandValues(set<CmdValueIndex>& list_write_cmd
     // 空なら即時return
     if ( list_write_cmd.empty() ) return;
     // 書き込む範囲のイテレータを取得
-    const auto it_start = min_element(list_write_cmd.begin(), list_write_cmd.end());
-          auto it_end   = max_element(list_write_cmd.begin(), list_write_cmd.end());
-    // 分割書き込みが有効な場合を再帰で実装するため, 書き込む範囲を1つ目のみに制限
-    if ( use_split_write_ ) it_end = it_start;
-    // 書き込む範囲の値(cmd_dp_listのIndex)を取得, ここで読み取らないとeraseで消えてしまう
-    const CmdValueIndex cmd_start = *it_start, cmd_end = *it_end;
-    // 今回で書き込む範囲は削除, use_split_write_=falseの場合は全て削除, trueの場合は先頭だけ削除
-    list_write_cmd.erase(it_start, ++it_end);
+    const auto start = min_element(list_write_cmd.begin(), list_write_cmd.end());
+          auto end   = max_element(list_write_cmd.begin(), list_write_cmd.end());
+    // 分割書き込みが有効な場合書き込む範囲を1つ目のみに制限,残りは再帰的に処理する．
+    if ( use_split_write_ ) end = start;
     // 書き込みに必要な変数を用意
     vector<DynamixelAddress> target_cmd_dp_list;  // 書き込むコマンドのアドレスのベクタ
     map<uint8_t, vector<int64_t>> id_cmd_vec_map; // id と 書き込むデータのベクタのマップ
-    for (size_t cmd = cmd_start; cmd <= cmd_end; cmd++) { // アドレスのベクタと，データのベクタの並びは対応している必要があるので，同一のループで作成する．
+    for (size_t cmd = *start; cmd <= *end; cmd++) { // アドレスのベクタと，データのベクタの並びは対応している必要があるので，同一のループで作成する．
         const auto dp = cmd_dp_list[cmd];
         target_cmd_dp_list.push_back(dp); 
         for (auto id : id_list_) if ( series_[id]==SERIES_X ) {
@@ -198,7 +194,8 @@ void DynamixelHandler::SyncWriteCommandValues(set<CmdValueIndex>& list_write_cmd
     }
     // SyncWriteでまとめて書き込み
     dyn_comm_.SyncWrite(target_cmd_dp_list, id_cmd_vec_map);
-    // 分割書き込みのための再帰的な処理, list_write_cmdが空ならすぐ帰ってくる
+    // 分割書き込みのため，今回書き込みした範囲を消去して残りを再帰的に処理, use_split_write_=falseの場合は全て削除されるので直後に終了する
+    list_write_cmd.erase(start, ++end);
     SyncWriteCommandValues(list_write_cmd);
     // 後処理，再帰の終端で実行される
     is_cmd_updated_.clear();
