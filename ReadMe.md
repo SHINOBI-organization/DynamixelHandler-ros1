@@ -49,7 +49,8 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
      - [＋] write の周期が一定になり，read の圧迫や負荷の変動が起きづらい
      - [－] 一度 command をストアするので，topic の sub から 最大 1/roop_late [sec] の遅延が生じてしまう．
    - もう一つの方法：sub callback で直接 write
-     - 上記の逆     
+     - 上記の逆
+       
 ## how to install
 
 ```
@@ -337,3 +338,50 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
  - realtime_tick          : not support
  - moving                 : not support
  - moving_status          : not support
+
+## 速度に関してメモ
+
+### Sync Read vs Fast Sync Read("use_fast_read"パラメータ)
+結論としては，低レイテンシタイマーだとFastの方がよい．
+
+自分環境だとレイテンシタイマーが大きいとあまり違いを感じなかった．
+しかし，速度を上げるためにレイテンシタイマーを小さくすると Sync Read の失敗率がかなり大きくなった．
+サーボから順番にパケットが送られてくるため，後半のサーボからのパケットがタイムアウトしてしまう用だった．
+14サーボ直列だと，lib_dynamixel側のLATENCY_TIMER=6ms, デバイス側のlatency timer=2msが，Sync Readの限界だった．
+Fast Sync Read だとlib_dynamixel側のLATENCY_TIMER=2ms, デバイス側のlatency timer=2msまで行けた．
+この領域での6msと2msの差は大きく，200Hz以上で回そうと思うとFast Sync Readが必須という感じである．
+
+Fast側のデメリットとしては，直列しているサーボのどこかで断線等が起きた場合に弱いという点が挙げられる．
+Fastはパケットがつながっているため，1つでも返事をしないサーボがあるとパケットが全滅してしまう．
+（これはlib_dynamixelのパケット処理の実装が悪いかもしれないが，知識不足ですぐに改善できなさそう．）
+通常のSync Readはパケットが独立しているため，断線するより前のサーボからの返事は受け取ることができる．
+断線や接続不良が危惧されるような状況では通信周期を犠牲にして，Sync Readを使わざるを得ないだろう．
+
+### 複数アドレスの同時読み込み("use_split_read"パラメータ)
+後述の書き込みと異なり，こちらは分割ではなく同時にするのが良い．
+すなわち"use_split_read"は`false`を推奨する．
+
+複数のアドレスからデータを読み込みたいとき，分割して読み込む場合はシリアル通信の処理時間が，アドレス数分だけ長くなる．
+100Hz以上で回そうと思うと，present_current, present_velocity, present_positionという基本の3つを分割して取り出すだけでもきつい．
+自分の環境では，前述の3つくらいの同時読み込みであれば，120Hz~180Hzくらいでる．200Hzは場合によって出るか出ないかというところ．
+分割読み込みでは80Hzくらいで頭打ちとなってしまった．
+present系の8つのアドレスすべてから読み込んでも，同時読み込みなら100Hzくらいはでる．
+分割読み込みだと30Hzも怪しい．
+
+（上記は全て，　14サーボ直列，lib_dynamixel側のLATENCY_TIMER=2ms, デバイス側のlatency timer=2msでの結果）
+
+
+### 複数アドレスの同時書き込み("use_split_write"パラメータ)
+書き込みに関しては，同時ではなく分割するのが良いだろう．
+すなわち"use_split_write"は`true`を推奨する．
+
+自分の環境では，"use_split_write"を`false`の状態で，12サーボに goal_current, goal_velocity, profile_acc, profile_vel, goal_position を同時にSync Writeしようとしたら，書き込みが失敗してうまく動かなかった． 
+書き込むサーボが少なければ動く．
+また，"use_split_write"を`true`にして，分割で書き込み，1度に書き込むアドレスを減らしても動く．
+書き込みに関しては，分割して行っても処理時間はほぼ変わらない(1ms未満しか遅くならない)ので，基本は`true`としておくべき．
+
+### その他
+色々試したが，Writeを100Hzくらいでやるとすると，"loop_rate"=200, "ratio_read_state"=2がちょうどよさそう．
+（全体周期200Hzで，そのうち2回に1回Readするので，readは100Hz）
+これ以上readの周期を上げようとするとCPU使用率が高くなりすぎる．
+また，通信の失敗率(time out)が高くなりすぎる．
