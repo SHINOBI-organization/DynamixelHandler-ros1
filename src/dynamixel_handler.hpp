@@ -193,9 +193,7 @@ class DynamixelHandler {
         // 上記の変数を適切に使うための補助的なフラグ
         static inline map<uint8_t, Time> when_op_mode_updated_; // 各dynamixelの id と op_mode_ が更新された時刻のマップ
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
-        static inline bool has_any_hardware_error_    = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
-        static inline bool has_comm_error_read_state_ = false; // 直前のstate_values_の読み込みが通信エラーを起こしたかどうか
-        static inline bool is_timeout_read_state_     = false; // 直前のstate_values_の読み込みがタイムアウトしたかどうか
+        static inline bool has_hardware_err_ = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
         // 各周期で実行するserial通信の内容を決めるためのset
         static inline set<CmdValueIndex> list_write_cmd_  = {};
         static inline set<StValueIndex>  list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
@@ -204,12 +202,11 @@ class DynamixelHandler {
         static void SyncWriteOption_Mode();  // todo 
         static void SyncWriteOption_Gain();  // todo 
         static void SyncWriteOption_Limit(); // todo 
-        static bool SyncReadStateValues(StValueIndex target);
-        static bool SyncReadStateValues(const set<StValueIndex>& list_read_state=list_read_state_);
-        static bool SyncReadHardwareErrors();
-        static bool SyncReadOption_Mode();  // todo
-        static bool SyncReadOption_Gain();  // todo
-        static bool SyncReadOption_Limit(); // todo
+        static double SyncReadStateValues(set<StValueIndex> list_read_state=list_read_state_);
+        static double SyncReadHardwareErrors();
+        static double SyncReadOption_Mode();  // todo
+        static double SyncReadOption_Gain();  // todo
+        static double SyncReadOption_Limit(); // todo
 };
 
 namespace dyn_x{
@@ -304,12 +301,12 @@ static string control_table_layout(int width, const map<uint8_t, vector<int64_t>
 static string id_list_layout(const vector<uint8_t>& id_list, const string& header=""){
     std::stringstream ss;
     ss << header << "\n";
-    ss << " ID : ["; 
+    ss << " ID : [ "; 
     for ( auto id : id_list ) {
-        ss << setw(2) << (int)id; 
-        if ( id != id_list.back()) ss << ",";
+        ss << (int)id; 
+        if ( id != id_list.back()) ss << ", ";
     }
-    ss << "]";
+    ss << " ]";
     return ss.str();
 }
 

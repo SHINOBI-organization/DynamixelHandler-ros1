@@ -86,21 +86,17 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     }
 
     // 最初の一回は全ての情報をread & publish
-    if ( SyncReadStateValues()     ) BroadcastDxlState();
-    if ( SyncReadHardwareErrors()  ) BroadcastDxlError();
-    if ( SyncReadOption_Mode()  ) BroadcastDxlOption_Mode();
-    if ( SyncReadOption_Gain()  ) BroadcastDxlOption_Gain();
-    while ( ros::ok() && option_limit_.size() != id_list_.size() ) SyncReadOption_Limit(); // Limitは読み取れないとまずいので，確実に．
-        BroadcastDxlOption_Limit();
+    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ); BroadcastDxlState();
+    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ); BroadcastDxlError();
+    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ); BroadcastDxlOption_Limit();
+    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ); BroadcastDxlOption_Gain();
+    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ); BroadcastDxlOption_Mode();
 
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;
     if (!nh_p.getParam("init/hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
     if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION, TORQUE_DISABLE);
-        dyn_comm_.tryWrite(profile_acceleration, id, 10);
-        dyn_comm_.tryWrite(profile_velocity, id, 10);
         if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
         if ( do_torque_on )   TorqueOn(id);
     }
@@ -144,7 +140,7 @@ using std::chrono::microseconds;
 
 void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     static int cnt = -1; cnt++;
-    static float rtime=0, wtime=0, suc_read_part=1, suc_read_full=1, num_st_read=1;
+    static float rtime=0, wtime=0, num_st_suc_p=1, num_st_suc_f=1, num_st_read=1;
 
     
 /* 処理時間時間の計測 */ auto wstart = system_clock::now();
@@ -157,32 +153,28 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 /* 処理時間時間の計測 */ auto rstart = system_clock::now();
 
     //* Dynamixelから状態Read & topicをPublish
-    static bool is_st_suc = false;
+    static double rate_suc_st = 0.0;
     if ( ratio_state_pub_!=0 ) 
-    if ( !is_st_suc || cnt % ratio_state_pub_ == 0 ) { //直前が失敗している場合 or ratio_state_pub_の割合で実行
-        is_st_suc = false;
-        if ( !use_split_read_ ) 
-            is_st_suc  = SyncReadStateValues(list_read_state_);
-        else for (auto each_state : list_read_state_) 
-            is_st_suc += SyncReadStateValues(each_state);
+    if ( rate_suc_st<1.0 || cnt % ratio_state_pub_ == 0 ) { //直前が失敗している場合 or ratio_state_pub_の割合で実行
+        rate_suc_st = SyncReadStateValues();
         num_st_read++;
-        suc_read_part += is_st_suc;
-        suc_read_full += !(is_timeout_read_state_||has_comm_error_read_state_);
-        if (is_st_suc) BroadcastDxlState();
+        num_st_suc_p += rate_suc_st > 0.0;
+        num_st_suc_f += rate_suc_st > 1.0-1e-6;
+        if ( rate_suc_st>0.0 ) BroadcastDxlState();
     }
     if ( ratio_error_pub_!=0 )
     if ( cnt % ratio_error_pub_ == 0 ) { // ratio_error_pub_の割合で実行
-        bool is_err_suc = SyncReadHardwareErrors();
-        if (is_err_suc) BroadcastDxlError();
+        double rate_suc_err = SyncReadHardwareErrors();
+        if ( rate_suc_err>0.0) BroadcastDxlError();
     }
     if ( ratio_option_pub_!=0 )
     if ( cnt % ratio_option_pub_ == 0 ) { // ratio_option_pub_の割合で実行
-        bool is_mode_suc = SyncReadOption_Mode(); // 処理を追加する可能性を考えて，変数を別で用意する冗長な書き方をしている．
-        if (is_mode_suc) BroadcastDxlOption_Mode();
-        bool is_lim_suc = SyncReadOption_Limit();
-        if (is_lim_suc)  BroadcastDxlOption_Limit();
-        bool is_gain_suc = SyncReadOption_Gain();
-        if (is_gain_suc) BroadcastDxlOption_Gain();
+        double rate_suc_lim = SyncReadOption_Limit(); // 処理を追加する可能性を考えて，変数を別で用意する冗長な書き方をしている．
+        if ( rate_suc_lim >0.0 ) BroadcastDxlOption_Limit();
+        double rate_suc_gain = SyncReadOption_Gain();
+        if ( rate_suc_gain>0.0 ) BroadcastDxlOption_Gain();
+        double rate_suc_mode = SyncReadOption_Mode();
+        if ( rate_suc_mode>0.0 ) BroadcastDxlOption_Mode();
     }
 
 /* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
@@ -190,14 +182,14 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     //* デバック
     if ( ratio_mainloop_ !=0 ) 
     if ( cnt % ratio_mainloop_ == 0) {
-        float partial_suc = 100*suc_read_part/num_st_read; float full_suc = 100*suc_read_full/num_st_read;
+        float partial_suc = 100*num_st_suc_p/num_st_read; float full_suc = 100*num_st_suc_f/num_st_read;
         char msg[100]; sprintf(msg, "Loop [%d]: read=%.2fms write=%.2fms success=%.0f%%(%.0f%%)",
                                 cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, partial_suc, full_suc);
         if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
         /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 
     }
     if ( cnt % max({loop_rate_, ratio_mainloop_, 10}) == 0) // 成功率の計測を初期化
-        suc_read_part = suc_read_full = num_st_read=0.00001;
+        num_st_suc_p = num_st_suc_f = num_st_read=0.00001;
         
 }
 
