@@ -40,10 +40,22 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
 
 ### 未実装機能
  - 精度に合わせてpubする値を丸める
- - profile_velocity_とprofile_accelerationを command topic から設定できるようにする
- - 各種のlimitをsub/pubできるようにする
- - 各種のgainをsub/pubできるようにする
- - 各種のmodeをsub/pubできるようにする
+ - profile_velocity_とprofile_acceleration
+   - 書き込みは実装できているので，command topic から設定できるようにする
+   - 電源喪失・モードチェンジ・Rebootで初期化されていしまう問題への対処
+ - limit系
+   - paramからの設定ができるようにする
+   - pubできるようにする
+   - （subによる動的な設定はできなくていいか？）
+ - gain系
+   - paramから設定できるようにする
+   - pubできるようにする
+   - 電源喪失・Rebootで初期化されていしまう問題の対処
+   - モード変更によってモードごとのデフォルト値に初期化される問題の対処
+     - FW ver 45 以上で使えるresotre_configurationだと，バックアップ作成時点の値になってしまい，意図と異なる場合が発生しかねない． 
+ - mode系
+   - paramから設定できるようにする
+   - pubできるようにする
  - commnad topic を service にする
  - baudrate を統一し一括変更できる sub node を作成する
  - 電流/速度制御時に通信が途切れたら自動で停止するようにする
