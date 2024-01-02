@@ -9,17 +9,24 @@ note: ROS1のみ対応
 note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど予定している）
 
 ## features of this package
- - node を起動するだけで連結したDynamixelを自動で認識
+ - Dynamixelというサーボを動かすことに特化した最小単位のPkg
+   - このPkgの dynamixel_handler node と ロボットの制御を行う別の node を組み合わせて使う
+   - ほかのSDKと異なりコードを直接編集する必要なし
+   - ほかのSDKと異なりコントロールテーブルのaddressや分解能などは意識する必要なし
+   - 動かしたいDynamixelが「Jointとして使われているのか」「Wheelとして使われているのか」などの事前情報は不要
  - ROS topic の pub/sub のみでDynamixelを制御可能
    - 指定した周期で指定した情報を state topic としてpub (デフォルト: 電流/速度/位置, 50Hz)
    - 指定した周期でハードウェアエラーを error topic としてpub (デフォルト: 0.5Hz)
    - subした command topic に合わせて制御モードを自動で変更 (電流/速度/位置/電流制限付き位置/拡張位置制御に対応)
    - sub/pubされる情報はパルス値ではなく物理量
- - 比較的高速なRead/Writeを実現 (12サーボに電流/速度/位置を Read/Write しても150Hzくらい)
+   - ユーザは純粋にサーボの目標状態(角度/速度など)を指令するだけでサーボを制御でき，  
+     また，同様にサーボの現在状態(角度/速度)を受け取れる
+ - 比較的高速なRead/Writeを実現 (12サーボに電流/速度/位置を Read/Write しても150Hzくらいは出せる)
    - 複数のアドレスを一括で読み書き & 複数のサーボを同時に読み書き(SyncRead/SyncWrite) によって Read 回数を抑える
    - Fast Sync Read インストラクションを活用して Read を高速化
    - Raed/Write は ROS node の周期と同期しているので，topicのcallbackに左右されない．
-   - ※ 適切な`LATENCY_TIMER`の設定が必要
+   - ※ 適切な`LATENCY_TIMER`の設定が必要(2 ~ 4msくらい)
+ - node を起動するだけで連結したDynamixelを自動で認識
  - node を kill したタイミングで動作を停止
  - 初期化時にエラーを自動でクリア
  - エラークリア時の回転数消失問題を homing offset により自動補正
@@ -29,7 +36,9 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
    - Read/Write されるパルス値
    - Readに失敗したID
    - etc...
-  
+
+***************************
+
 ### 未実装機能
  - 精度に合わせてpubする値を丸める
  - profile_velocity_とprofile_accelerationを command topic から設定できるようにする
@@ -43,13 +52,20 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
  - free command topic が対応しているコマンドを増やす
    - 特にユーザ定義のアドレスをreadするようなコマンドを追加したい
  - free state topic として，ユーザー定義のアドレスの値を監視できるようにする
- - command の設定値を sub callback でストアしてからメインループで write しているので，最大 1/roop_late [sec] の遅延が生じうる．
+ - command の設定値を callback でストアしてからメインループで write しているので，最大 1/roop_late [sec] の遅延が生じうる．
    - 現在の方法：sub callback でストアしメインループで write
-     - [＋] 各IDへの command が別の topic に乗ってきても，node 側で 1/roop_late [sec] 分の command をまとめてくれる -> write回数が抑えられる．
-     - [＋] write の周期が一定になり，read の圧迫や負荷の変動が起きづらい
+     - [＋] write回数が抑えられる．
+       - 各IDへの command が別の topic に乗ってきても，node 側で 1/roop_late [sec] 分の command をまとめてくれる
+     - [＋] write の周期が一定以下になり，read の圧迫や負荷の変動が起きづらい
      - [－] 一度 command をストアするので，topic の sub から 最大 1/roop_late [sec] の遅延が生じてしまう．
+       - 8ms未満くらいは遅れるが，そもそものtopicの遅延の方が支配的?(topic遅延が6ms，callback->writeが遅延2ms)
    - もう一つの方法：sub callback で直接 write
-     - 上記の逆     
+     - [＋] callback後の遅延は生じない
+     - [－] topic の pub の仕方によってはwrite回数が増えてしまう
+       - 例えば，ID:5へ指令する command topic と ID:6が別のノードからpubされているとすると，callbackは2回呼ばれる．一度ストアしてからまとめてWrite方式だとwriteは1回だが，callbackで直接Write方式だとwriteも2回
+
+***************************
+
 ## how to install
 
 ```
@@ -59,6 +75,8 @@ $ cd ./dynamixel_handler
 $ git submodule init
 $ git submodule update
 ```
+
+***************************
 
 ## how to use
 
@@ -96,9 +114,10 @@ dynamixel_handler.launchの以下の部分を編集し，保存
 $ roslaunch dynamixel_handler dynamixel_handler.launch
 ```
 
-### 3. 角度の制御
+### 3. 状態を制御
 
-ID:5のDynamixelを位置制御モード(position control mode)で角度を90degにしたい場合
+ID:5のDynamixel Xシリーズ のサーボを位置制御モード(position control mode)で角度を90degにしたい場合．
+以下のように，`/dynamixel/cmd/x/position` topicを送ればよい．
 
 ```
 $ rostopic pub /dynamixel/cmd/x/position \
@@ -107,8 +126,43 @@ dynamixel_handler/DynamixelCommand_X_ControlPosition \
 ```
 ID:5のDynamixelが位置制御モードでなかった場合は自動で変換される．
 
-note: topic監視によるデバックの容易性の観点から角度はすべてdegにしてある
+#### command topic 
 
+制御指令はカスタム msg として次のように定義している．
+
+位置制御用, `/dynamixel/cmd/x/position`に対応
+```
+uint16[] id_list
+float64[] position__deg
+```
+
+速度制御用, `/dynamixel/cmd/x/velocity`に対応
+```
+uint16[] id_list
+float64[] velocity__deg_s
+```
+
+電流制御用，`/dynamixel/cmd/x/current`に対応
+```
+uint16[] id_list
+float64[] current__mA
+```
+
+拡張位置制御用，`/dynamixel/cmd/x/extended_position`に対応
+```
+uint16[] id_list
+float64[] position__deg
+float64[] rotation # optional, 256までの回転数を指定できる
+```
+
+電流制限付き位置制御用，`/dynamixel/cmd/x/current_position`に対応
+```
+uint16[] id_list
+float64[] current__mA
+float64[] position__deg
+float64[] rotation # optional, 256までの回転数を指定できる
+```
+note: topic監視によるデバックの容易性の観点から角度はすべてdegにしてある
 
 ### 4.状態の確認
 
@@ -116,8 +170,11 @@ ID:5とID:6のモータが接続している場合
 
 ```
 $ rostopic echo /dyanmixel/state
+```
 
-# 出力例
+出力例
+```
+~~~
 ---
 stamp: 
   secs: 1703962959
@@ -134,18 +191,12 @@ input_voltage__V: [] // 現在の入力電圧
 stamp:
   secs: 1703962959
   nsecs: 396484578
-id_list: [5, 6]
-current__mA: [0.0, -2.69]
-velocity__deg_s: [0.0, 0.0]
-position__deg: [89.91210937499999, -0.2636718750000023]
-vel_trajectory__deg_s: []
-pos_trajectory__deg: []
-temperature__degC: []
-input_voltage__V: []
+~~~
 ```
-
 どの情報をpubするかは ros param から設定可能．
 paramの章を参照
+
+***************************
 
 ## topic
 
@@ -170,12 +221,15 @@ paramの章を参照
 
 サーボからの出力を監視するためのtopic.
 
+
  - /dynamixel/state_free : 未実装
  - /dynamixel/state
  - /dynamixel/error
  - /dynamixel/option/gain/r : 未実装
  - /dynamixel/option/limit/r : 未実装
  - /dynamixel/option/mode/r : 未実装
+
+***************************
 
 ## param
 
@@ -227,6 +281,8 @@ paramの章を参照
 <param name="varbose/read_hardware_error"   value="true"/>  <!-- 検出したHardware errorを出力 -->
 ```
 
+***************************
+
 ## 初期設定と注意事項
 
 `include\mylib_dynamixel\download\port_handler_linux.cpp` 内の `LATENCY_TIMER` と使用するUBSデバイスのlatency timerを一致させる必要がある．
@@ -263,6 +319,8 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 echo 4 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 ```
+
+***************************
 
 ## Control Table との対応
 
@@ -337,3 +395,56 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
  - realtime_tick          : not support
  - moving                 : not support
  - moving_status          : not support
+
+***************************
+
+## 速度に関してメモ
+
+### Sync Read vs Fast Sync Read("use_fast_read"パラメータ)
+結論としては，低レイテンシタイマーだとFastの方がよい．
+
+自分環境だとレイテンシタイマーが大きいとあまり違いを感じなかった．
+しかし，速度を上げるためにレイテンシタイマーを小さくすると Sync Read の失敗率がかなり大きくなった．
+サーボから順番にパケットが送られてくるため，後半のサーボからのパケットがタイムアウトしてしまう用だった．
+14サーボ直列だと，lib_dynamixel側のLATENCY_TIMER=6ms, デバイス側のlatency timer=2msが，Sync Readの限界だった．
+Fast Sync Read だとlib_dynamixel側のLATENCY_TIMER=2ms, デバイス側のlatency timer=2msまで行けた．
+この領域での6msと2msの差は大きく，200Hz以上で回そうと思うとFast Sync Readが必須という感じである．
+
+Fast側のデメリットとしては，直列しているサーボのどこかで断線等が起きた場合に弱いという点が挙げられる．
+Fastはパケットがつながっているため，1つでも返事をしないサーボがあるとパケットが全滅してしまう．
+（これはlib_dynamixelのパケット処理の実装が悪いかもしれないが，知識不足ですぐに改善できなさそう．）
+通常のSync Readはパケットが独立しているため，断線するより前のサーボからの返事は受け取ることができる．
+断線や接続不良が危惧されるような状況では通信周期を犠牲にして，Sync Readを使わざるを得ないだろう．
+
+### 複数アドレスの同時読み込み("use_split_read"パラメータ)
+後述の書き込みと異なり，こちらは分割ではなく同時にするのが良い．
+すなわち"use_split_read"は`false`を推奨する．
+
+複数のアドレスからデータを読み込みたいとき，分割して読み込む場合はシリアル通信の処理時間が，アドレス数分だけ長くなる．
+100Hz以上で回そうと思うと，present_current, present_velocity, present_positionという基本の3つを分割して取り出すだけでもきつい．
+自分の環境では，前述の3つくらいの同時読み込みであれば，120Hz~180Hzくらいでる．200Hzは場合によって出るか出ないかというところ．
+分割読み込みでは80Hzくらいで頭打ちとなってしまった．
+present系の8つのアドレスすべてから読み込んでも，同時読み込みなら100Hzくらいはでる．
+分割読み込みだと30Hzも怪しい．
+
+（上記は全て，　14サーボ直列，lib_dynamixel側のLATENCY_TIMER=2ms, デバイス側のlatency timer=2msでの結果）
+
+
+### 複数アドレスの同時書き込み("use_split_write"パラメータ)
+書き込みに関しては，同時ではなく分割するのが良いだろう．
+すなわち"use_split_write"は`true`を推奨する．
+
+自分の環境では，"use_split_write"を`false`の状態で，12サーボに goal_current, goal_velocity, profile_acc, profile_vel, goal_position を同時にSync Writeしようとしたら，書き込みが失敗してうまく動かなかった． 
+書き込むサーボが少なければ動く．
+また，"use_split_write"を`true`にして，分割で書き込み，1度に書き込むアドレスを減らしても動く．
+書き込みに関しては，分割して行っても処理時間はほぼ変わらない(1ms未満しか遅くならない)ので，基本は`true`としておくべき．
+
+### その他
+色々試したが，Writeを100Hzくらいでやるとすると，"loop_rate"=200, "ratio_read_state"=2がちょうどよさそう．
+（全体周期200Hzで，そのうち2回に1回Readするので，readは100Hz）
+これ以上readの周期を上げようとするとCPU使用率が高くなりすぎる．
+また，通信の失敗率(time out)が高くなりすぎる．
+
+追記  
+Writeによって，Readのtime outが発生していたのは，Writeの直後にReadを同期的に行っていたためだった模様．
+とりあえずWrite直後に0.5msのsleepを入れたら改善して，"loop_rate"=300, "ratio_read_state"=2まで行けた．
