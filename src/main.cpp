@@ -87,6 +87,7 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
 
     // 状態のreadの前にやるべき初期化
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
+        // WriteBusWatchdog(id, 0);
         WriteHomingOffset(id, 0.0); // 設定ファイルからとってこれるようにする
         WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/); //  設定ファイルからとってこれるようにする
     }
@@ -104,16 +105,6 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) ros::Duration(0.05).sleep();
     BroadcastDxlOption_Mode();
 
-    // 状態のreadの後にやるべき初期化
-    bool do_clean_hwerr, do_torque_on;
-    if (!nh_p.getParam("init/hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
-    if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
-    ROS_INFO("Initializing dynamixel state  ...");
-    for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        if ( do_clean_hwerr ) ClearHardwareError(id);
-        if ( do_torque_on )   TorqueOn(id);
-    }
-
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
         cmd_values_[id][GOAL_PWM]      = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);
@@ -122,6 +113,16 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
         cmd_values_[id][PROFILE_ACC]   = profile_acceleration.pulse2val(dyn_comm_.tryRead(profile_acceleration, id), model_[id]);
         cmd_values_[id][PROFILE_VEL]   = profile_velocity.pulse2val    (dyn_comm_.tryRead(profile_velocity    , id), model_[id]);
         cmd_values_[id][GOAL_POSITION] = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);
+    }
+
+    // 状態のreadの後にやるべき初期化
+    bool do_clean_hwerr, do_torque_on;
+    if (!nh_p.getParam("init/hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
+    if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
+    ROS_INFO("Initializing dynamixel state  ...");
+    for (auto id : id_list_) if (series_[id] == SERIES_X) {
+        if ( do_clean_hwerr ) ClearHardwareError(id); // 現在の状態を変えない
+        if ( do_torque_on )   TorqueOn(id);           // 現在の状態を変えない
     }
 
     //  readする情報の設定

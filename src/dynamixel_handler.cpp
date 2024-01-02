@@ -59,7 +59,7 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
     if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
     // 変更前のトルク状態を確認
-    bool before = ReadTorqueEnable(id); // read失敗しても0が返ってくるので問題ない
+    const bool before = ReadTorqueEnable(id); // read失敗しても0が返ってくるので問題ない
     WriteTorqueEnable(id, TORQUE_DISABLE);
     WriteOperatingMode(id, mode);  //**RAMのデータが消えるので注意, Gain値のデフォルトも変わる．面倒な．．．
     // WriteGains(id, opt_gain_[id]);
@@ -70,6 +70,8 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     if ( is_changed ) {
         op_mode_[id] = mode;
         when_op_mode_updated_[id] = Time::now();
+        // if ( mode==OPERATING_MODE_CURRENT ) WriteBusWatchdog(id, 2500 /*ms*/);
+        // if ( mode==OPERATING_MODE_VELOCITY) WriteBusWatchdog(id, 2500 /*ms*/);
         ROS_INFO("ID [%d] is changed operating mode [%d]", id, mode);
     } else {
         ROS_ERROR("ID [%d] failed to change operating mode", id); 
@@ -80,7 +82,7 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
 // モータを停止させてからトルクを入れる．
 bool DynamixelHandler::TorqueOn(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    auto now_pos = ReadPresentPosition(id); // 失敗すると0が返って危ないので確認する
+    const auto now_pos = ReadPresentPosition(id); // 失敗すると0が返って危ないので確認する
     if ( !( dyn_comm_.timeout_last_read() || dyn_comm_.comm_error_last_read() )){
         cmd_values_[id][GOAL_POSITION] = now_pos; // トルクがオフならDynamixel本体のgoal_positionはpresent_positionと一致しているので
         cmd_values_[id][GOAL_VELOCITY] = 0.0;     // goal_velocity, goal_currentはともに0担っている．
