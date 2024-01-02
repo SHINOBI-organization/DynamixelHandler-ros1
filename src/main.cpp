@@ -9,7 +9,7 @@ bool DynamixelHandler::TmpTest(){
 
 bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     // Subscriber / Publisherの設定
-    sub_cmd_free_   = nh.subscribe("/dynamixel/cmd_free",    10, DynamixelHandler::CallBackDxlCommandFree);
+    sub_command_    = nh.subscribe("/dynamixel/command",    10, DynamixelHandler::CallBackDxlCommand);
     sub_cmd_profile_= nh.subscribe("/dynamixel/cmd/profile", 10, DynamixelHandler::CallBackDxlCommand_Profile);
     sub_cmd_x_pos_  = nh.subscribe("/dynamixel/cmd/x/position", 10, DynamixelHandler::CallBackDxlCommand_X_Position);
     sub_cmd_x_vel_  = nh.subscribe("/dynamixel/cmd/x/velocity", 10, DynamixelHandler::CallBackDxlCommand_X_Velocity);
@@ -20,7 +20,6 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     sub_opt_mode_ = nh.subscribe("/dynamixel/opt/mode/w", 10, DynamixelHandler::CallBackDxlOption_Mode);
     sub_opt_limit_= nh.subscribe("/dynamixel/opt/limit/w",10, DynamixelHandler::CallBackDxlOption_Limit);
 
-    pub_st_free_   = nh.advertise<dynamixel_handler::DynamixelStateFree>("/dynamixel/st_free", 10);
     pub_state_     = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
     pub_error_     = nh.advertise<dynamixel_handler::DynamixelError>("/dynamixel/error", 10);
     pub_opt_limit_ = nh.advertise<dynamixel_handler::DynamixelOption_Limit>("/dynamixel/opt/limit/r", 10);
@@ -87,26 +86,24 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
 
     // 状態のreadの前にやるべき初期化
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        // WriteBusWatchdog(id, 0);
+        WriteBusWatchdog(id, 0);
         WriteHomingOffset(id, 0.0); // 設定ファイルからとってこれるようにする
         WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/); //  設定ファイルからとってこれるようにする
     }
 
     // 最初の一回は全ての情報をread & publish
     ROS_INFO("Reading present dynamixel state  ...");
-    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) ros::Duration(0.05).sleep();
-    BroadcastDxlState();
-    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) ros::Duration(0.05).sleep();
-    BroadcastDxlError();
-    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) ros::Duration(0.05).sleep();
-    BroadcastDxlOption_Limit();
-    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) ros::Duration(0.05).sleep();
-    BroadcastDxlOption_Gain();
-    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) ros::Duration(0.05).sleep();
-    BroadcastDxlOption_Mode();
+    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlState();
+    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlError();
+    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Limit();
+    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Gain();
+    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Mode();
+    // while ( ros::ok() && SyncReadOption_Config()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Config();
+    // while ( ros::ok() && SyncReadOption_Extra()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Extra();
 
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
+        op_mode_[id] = dyn_comm_.tryRead(operating_mode, id);
         cmd_values_[id][GOAL_PWM]      = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);
         cmd_values_[id][GOAL_CURRENT]  = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);
         cmd_values_[id][GOAL_VELOCITY] = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);
@@ -159,7 +156,7 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 /* 処理時間時間の計測 */ auto wstart = system_clock::now();
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     SyncWriteCommandValues();
-    // ros::Duration(0.0002).sleep(); // 0.2ms待つ // 無くてもよさそう
+    // rsleep(0.0002); // 0.2ms待つ // 無くてもよさそう
 /* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 
     //* Dynamixelから状態Read & topicをPublish
@@ -193,8 +190,8 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     if ( ratio_mainloop_ !=0 ) 
     if ( cnt % ratio_mainloop_ == 0) {
         float partial_suc = 100*num_st_suc_p/num_st_read; float full_suc = 100*num_st_suc_f/num_st_read;
-        char msg[100]; sprintf(msg, "Loop [%d]: read=%.2fms write=%.2fms success=%.0f%%(%.0f%%)",
-                                cnt, rtime/num_st_read, wtime/ratio_mainloop_, partial_suc, full_suc);
+        char msg[100]; sprintf(msg, "Loop [%d]: write=%.2fms read=%.2fms(p/f=%3.0f%%/%3.0f%%)",
+                                cnt, wtime/ratio_mainloop_, rtime/num_st_read, partial_suc, full_suc);
         if (full_suc < 80) ROS_ERROR("%s", msg); else if (partial_suc < 99) ROS_WARN("%s", msg); else ROS_INFO("%s", msg);
         /* mainloopで行われてる処理の計測時間を初期化 */wtime = 0.0; 
     }
@@ -205,8 +202,9 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 
 void DynamixelHandler::Terminate(int sig){
     ROS_INFO("Terminating DynamixelHandler ...");
-    dyn_comm_.set_retry_config(200, 5); // retryの設定を変更
-    for(auto id : id_list_) StopRotation(id);
+    dyn_comm_.set_retry_config(20, 5); // retryの設定を変更
+    StopDynamixels();
+    ROS_INFO("Terminating DynamixelHandler Finished");
     ros::shutdown();
 }
 

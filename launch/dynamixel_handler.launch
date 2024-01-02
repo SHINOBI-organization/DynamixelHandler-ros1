@@ -19,26 +19,24 @@
 
     <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
         <!-- トピックの設定 -->
-        <!-- ユーザー定義 -->
-        <remap from="/dynamixel/cmd_free"   to="/dynamixel/cmd_free"/>
-        <remap from="/dynamixel/state_free" to="/dynamixel/state_free"/>
-        <!-- 書き込みのみ -->
+        <!-- 書き込み -->
+        <remap from="/dynamixel/commnad"   to="/dynamixel/commnad"/>
         <remap from="/dynamixel/cmd/profile"             to="/dynamixel/cmd/profile"/>
         <remap from="/dynamixel/cmd/x/position"          to="/dynamixel/cmd/x/position"/>
         <remap from="/dynamixel/cmd/x/velocity"          to="/dynamixel/cmd/x/velocity"/>
         <remap from="/dynamixel/cmd/x/current"           to="/dynamixel/cmd/x/current"/>
         <remap from="/dynamixel/cmd/x/current_position"  to="/dynamixel/cmd/x/current_position"/>
         <remap from="/dynamixel/cmd/x/extended_position" to="/dynamixel/cmd/x/extended_position"/>
-        <!-- 読み込みのみ -->
-        <remap from="/dynamixel/state" to="/dynamixel/state"/>
-        <remap from="/dynamixel/error" to="/dynamixel/error"/>
-        <!-- 読み書き両方 -->
-        <remap from="/dynamixel/option/limit/r" to="/dynamixel/option/limit/r"/>
-        <remap from="/dynamixel/option/gain/r"  to="/dynamixel/option/gain/r" />
-        <remap from="/dynamixel/option/mode/r"  to="/dynamixel/option/mode/r" />
         <remap from="/dynamixel/option/limit/w" to="/dynamixel/option/limit/w"/>
         <remap from="/dynamixel/option/gain/w"  to="/dynamixel/option/gain/w" />
         <remap from="/dynamixel/option/mode/w"  to="/dynamixel/option/mode/w" />
+
+        <!-- 読み込み -->
+        <remap from="/dynamixel/state" to="/dynamixel/state"/>
+        <remap from="/dynamixel/error" to="/dynamixel/error"/>
+        <remap from="/dynamixel/option/limit/r" to="/dynamixel/option/limit/r"/>
+        <remap from="/dynamixel/option/gain/r"  to="/dynamixel/option/gain/r" />
+        <remap from="/dynamixel/option/mode/r"  to="/dynamixel/option/mode/r" />
 
         <!-- 通信の設定 -->
         <param name="device_name" value="$(arg DEVICE_NAME)"/>

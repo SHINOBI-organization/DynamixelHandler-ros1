@@ -7,14 +7,13 @@ using ros::Time;
 
 #include "dynamixel_communicator.h"
 #include <dynamixel_handler/DynamixelState.h>
-#include <dynamixel_handler/DynamixelStateFree.h>
 #include <dynamixel_handler/DynamixelError.h>
 #include <dynamixel_handler/DynamixelOption_Config.h>
 #include <dynamixel_handler/DynamixelOption_Extra.h>
 #include <dynamixel_handler/DynamixelOption_Gain.h>
 #include <dynamixel_handler/DynamixelOption_Limit.h>
 #include <dynamixel_handler/DynamixelOption_Mode.h>
-#include <dynamixel_handler/DynamixelCommandFree.h>
+#include <dynamixel_handler/DynamixelCommand.h>
 #include <dynamixel_handler/DynamixelCommand_Profile.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlPosition.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlVelocity.h>
@@ -44,6 +43,7 @@ using std::max;
 static const double DEG = M_PI/180.0; // degを単位に持つ数字に掛けるとradになる
 static double deg2rad(double deg){ return deg*DEG; }
 static double rad2deg(double rad){ return rad/DEG; }
+static void rsleep(double sec) { ros::Duration(sec).sleep(); }
 
 /**
  * DynamixelをROSで動かすためのクラス．本pkgのメインクラス． 
@@ -64,15 +64,16 @@ class DynamixelHandler {
 
         //* ROS publishを担う関数と subscliber callback関数
         static void BroadcastDxlState();
-        static void BroadcastDxlStateFree(); // todo 
         static void BroadcastDxlError();
+        static void BroadcastDxlOption_Config(); // todo
+        static void BroadcastDxlOption_Goal(); // todo
         static void BroadcastDxlOption_Limit(); // todo
         static void BroadcastDxlOption_Gain();  // todo
         static void BroadcastDxlOption_Mode();  // todo
         static void CallBackDxlOption_Limit (const dynamixel_handler::DynamixelOption_Limit& msg); // todo
         static void CallBackDxlOption_Gain  (const dynamixel_handler::DynamixelOption_Gain& msg);  // todo
         static void CallBackDxlOption_Mode  (const dynamixel_handler::DynamixelOption_Mode& msg);  // todo
-        static void CallBackDxlCommandFree               (const dynamixel_handler::DynamixelCommandFree& msg);    // todo
+        static void CallBackDxlCommand                   (const dynamixel_handler::DynamixelCommand& msg);    // todo
         static void CallBackDxlCommand_Profile           (const dynamixel_handler::DynamixelCommand_Profile& msg); // todo
         static void CallBackDxlCommand_X_Position        (const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg);
         static void CallBackDxlCommand_X_Velocity        (const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg);
@@ -81,12 +82,11 @@ class DynamixelHandler {
         static void CallBackDxlCommand_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg);
         //* ROS publisher subscriber instance
         static inline ros::Publisher  pub_state_;
-        static inline ros::Publisher  pub_st_free_;
         static inline ros::Publisher  pub_error_;
         static inline ros::Publisher  pub_opt_limit_;
         static inline ros::Publisher  pub_opt_gain_;
         static inline ros::Publisher  pub_opt_mode_;
-        static inline ros::Subscriber sub_cmd_free_;
+        static inline ros::Subscriber sub_command_;
         static inline ros::Subscriber sub_cmd_profile_;
         static inline ros::Subscriber sub_cmd_x_pos_;
         static inline ros::Subscriber sub_cmd_x_vel_;
@@ -100,11 +100,11 @@ class DynamixelHandler {
     private:
         DynamixelHandler() = delete;
         //* 単体通信を組み合わせた上位機能
+        static void StopDynamixels();
         static uint8_t ScanDynamixels(uint8_t id_max);
         static bool ClearHardwareError(uint8_t servo_id);
         static bool TorqueOn(uint8_t servo_id);
         static bool TorqueOff(uint8_t servo_id);
-        static bool StopRotation(uint8_t servo_id);
         static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode);
         //* Dynamixel単体との通信による下位機能
         static uint8_t ReadHardwareError(uint8_t servo_id);

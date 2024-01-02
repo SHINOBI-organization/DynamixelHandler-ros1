@@ -55,7 +55,6 @@ add_message_files(
   FILES
   
   # read専用
-  DynamixelCommandFree.msg
   DynamixelState.msg
   DynamixelError.msg
 
@@ -67,7 +66,7 @@ add_message_files(
   DynamixelOption_Mode.msg
     
   # write専用
-  DynamixelStateFree.msg
+  DynamixelCommand.msg
   DynamixelCommand_Profile.msg
   DynamixelCommand_X_ControlCurrent.msg
   DynamixelCommand_X_ControlCurrentPosition.msg

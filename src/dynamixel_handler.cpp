@@ -27,6 +27,15 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
     return id_list_.size();
 }
 
+// 全てのモータの動作を停止させる．
+void DynamixelHandler::StopDynamixels(){
+    vector<int64_t> offset_pulse(id_list_.size(), 0);
+    dyn_comm_.SyncWrite(homing_offset ,id_list_, offset_pulse); // マジで謎だが，BusWatchdogを設定するとHomingOffset分だけ回転してしまう...多分ファームrウェアのバグ
+    vector<int64_t> bus_watchtime_pulse(id_list_.size(), 1);
+    dyn_comm_.SyncWrite(bus_watchdog, id_list_, bus_watchtime_pulse);
+    ROS_INFO("All servo will be stopped,");
+}
+
 // 回転数が消えることを考慮して，モータをリブートする．
 bool DynamixelHandler::ClearHardwareError(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
@@ -41,8 +50,8 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id){
         if (now_pos < -M_PI) now_rot--;
         const double offset = now_offset+now_rot*(2*M_PI);
         dyn_comm_.Reboot(id); //** RAMのデータが消えるので注意
-                        // homing offsetが書き込めるまで待機する．
-        while ( !WriteHomingOffset(id, offset) && ros::ok() ) ros::Duration(0.01).sleep();
+        // homing offsetが書き込めるまで待機する．
+        while ( !WriteHomingOffset(id, offset) && ros::ok() ) rsleep(0.01);
         // WriteGains(id, opt_gain_[id]) 
         WriteProfiles(id,  cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]); // 失敗しても気にしない
     }
@@ -57,7 +66,7 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id){
 bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
-    if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
+    if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) rsleep(1.0); // 1秒以内に変更した場合は1秒待つ
     // 変更前のトルク状態を確認
     const bool before = ReadTorqueEnable(id); // read失敗しても0が返ってくるので問題ない
     WriteTorqueEnable(id, TORQUE_DISABLE);
@@ -87,6 +96,8 @@ bool DynamixelHandler::TorqueOn(uint8_t id){
         cmd_values_[id][GOAL_POSITION] = now_pos; // トルクがオフならDynamixel本体のgoal_positionはpresent_positionと一致しているので
         cmd_values_[id][GOAL_VELOCITY] = 0.0;     // goal_velocity, goal_currentはともに0担っている．
         cmd_values_[id][GOAL_CURRENT]  = 0.0;     // こちら側のgoal値も上記と同様にしないと，トルクオン時に急激な動きをして危険．
+        // WriteGains(id, opt_gain_[id]); // 電源喪失時に消えるデータを書き込む
+        WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]); // 電源喪失時に消えるデータを書き込む
         WriteTorqueEnable(id, TORQUE_ENABLE);
     }
     // 結果を確認
@@ -104,16 +115,6 @@ bool DynamixelHandler::TorqueOff(uint8_t id){
     bool is_disable = (ReadTorqueEnable(id) == TORQUE_DISABLE);
     if ( !is_disable ) ROS_ERROR("ID [%d] failed to disable torque", id);
     return is_disable;
-}
-
-// モータの動作を停止させる．
-bool DynamixelHandler::StopRotation(uint8_t id){
-    if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    WriteHomingOffset(id, 0.0); // マジで謎だが，BusWatchdogを設定するとHomingOffset分だけ回転してしまう...多分ファームrウェアのバグ
-    WriteBusWatchdog(id, 20 /*ms*/);
-    ros::Duration(0.02).sleep();
-    WriteBusWatchdog(id, 0); // 無効化
-    return true;
 }
 
 //* 基本機能たち
@@ -410,16 +411,22 @@ double DynamixelHandler::SyncReadOption_Limit(){
 
 //* ROS関係
 
-void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::DynamixelCommandFree& msg) {
-    auto id_list = msg.id_list; 
-    if (id_list.empty()) for (auto id : id_list_) id_list.push_back(id);
-    ROS_INFO("Command [%s] is received", msg.command.c_str());
-    if (msg.command == "clear")
+void DynamixelHandler::CallBackDxlCommand(const dynamixel_handler::DynamixelCommand& msg) {
+    vector<uint8_t> id_list;
+    if ( msg.id_list.empty() || msg.id_list[0]==0xFE) for (auto id : id_list_) id_list.push_back(id);
+                                                 else for (auto id : msg.id_list) id_list.push_back(id);
+    char header[100]; sprintf(header, "Command [%s] \n (id_list=[] or [254] means all IDs)", msg.command.c_str());
+    ROS_INFO_STREAM(id_list_layout(id_list, string(header)));
+    if (msg.command == "clear_error" || msg.command == "CE")
         for (auto id : id_list) { ClearHardwareError(id); TorqueOn(id);}
-    if (msg.command == "enable") 
+    if (msg.command == "torque_on"   || msg.command == "TON") 
         for (auto id : id_list) TorqueOn(id);
-    if (msg.command == "disable")
+    if (msg.command == "torque_off"  || msg.command == "TOFF")
         for (auto id : id_list) TorqueOff(id);
+    if (msg.command == "enable") 
+        for (auto id : id_list) WriteTorqueEnable(id, TORQUE_ENABLE);
+    if (msg.command == "disable")
+        for (auto id : id_list) WriteTorqueEnable(id, TORQUE_DISABLE);
     if (msg.command == "reboot") 
         for (auto id : id_list) dyn_comm_.Reboot(id);
 }
@@ -559,10 +566,6 @@ void DynamixelHandler::CallBackDxlOption_Limit(const dynamixel_handler::Dynamixe
 
 void DynamixelHandler::CallBackDxlOption_Mode(const dynamixel_handler::DynamixelOption_Mode& msg) {
  
-}
-
-void DynamixelHandler::BroadcastDxlStateFree(){
-
 }
 
 void DynamixelHandler::BroadcastDxlState(){
