@@ -203,7 +203,10 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 
 void DynamixelHandler::Terminate(int sig){
     ROS_INFO("Terminating DynamixelHandler ...");
-    dyn_comm_.set_retry_config(20, 5); // retryの設定を変更
+    ros::NodeHandle nh_p("~");
+    bool do_torque_off;
+    if (!nh_p.getParam("term/torque_auto_disable", do_torque_off  )) do_torque_off  = true;
+    if ( do_torque_off ) for ( auto id : id_list_ ) if (series_[id] == SERIES_X) TorqueOff(id);
     StopDynamixels();
     ROS_INFO("Terminating DynamixelHandler Finished");
     ros::shutdown();

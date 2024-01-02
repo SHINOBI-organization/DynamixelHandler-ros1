@@ -29,10 +29,12 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 
 // 全てのモータの動作を停止させる．
 void DynamixelHandler::StopDynamixels(){
-    vector<int64_t> offset_pulse(id_list_.size(), 0);
-    dyn_comm_.SyncWrite(homing_offset ,id_list_, offset_pulse); // マジで謎だが，BusWatchdogを設定するとHomingOffset分だけ回転してしまう...多分ファームrウェアのバグ
-    vector<int64_t> bus_watchtime_pulse(id_list_.size(), 1);
-    dyn_comm_.SyncWrite(bus_watchdog, id_list_, bus_watchtime_pulse);
+    vector<uint8_t> id_list; 
+    for (auto id : id_list_) if ( series_[id]==SERIES_X ) id_list.push_back(id);
+    vector<int64_t> offset_pulse(id_list.size(), 0);
+    dyn_comm_.SyncWrite(homing_offset ,id_list, offset_pulse); // マジで謎だが，BusWatchdogを設定するとHomingOffset分だけ回転してしまう...多分ファームrウェアのバグ
+    vector<int64_t> bus_watchtime_pulse(id_list.size(), 1);
+    dyn_comm_.SyncWrite(bus_watchdog, id_list, bus_watchtime_pulse);
     ROS_INFO("All servo will be stopped,");
 }
 
