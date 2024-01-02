@@ -28,20 +28,20 @@ uint8_t DynamixelHandler::ScanDynamixels(uint8_t id_max) {
 }
 
 // 回転数が消えることを考慮して，モータをリブートする．
-bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission after){
-    if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
+bool DynamixelHandler::ClearHardwareError(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
+    if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
 
     auto now_pos = ReadPresentPosition(id);
     int now_rot = (now_pos+M_PI) / (2*M_PI);
     if (now_pos < -M_PI) now_rot--;
 
     dyn_comm_.Reboot(id); //! RAMのデータが消えるので注意
-    sleep_for(0.5s);
+    ros::Duration(0.5).sleep(); // 0.5秒待つ
 
-    // WriteGains(id, opt_gain_[id]);
-    WriteHomingOffset(id, now_rot*(2*M_PI));
-    if( after == TORQUE_ENABLE ) TorqueOn(id);
+    /* 回転数を戻す*/   WriteHomingOffset(id, now_rot*(2*M_PI));
+    /* gainを戻す*/    // WriteGains(id, opt_gain_[id]);
+    /* Profileを戻す*/ WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);
 
     bool is_clear = ReadHardwareError(id) == 0b00000000;
     if (is_clear) ROS_INFO ("ID [%d] is cleared error", id);
@@ -50,15 +50,17 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id, DynamixelTorquePermission 
 }
 
 // モータの動作モードを変更する．連続で変更するときは1秒のインターバルを入れる
-bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode, DynamixelTorquePermission after){
+bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mode){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
     if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
+    // 変更前のトルク状態を確認
+    bool before = ReadTorqueEnable(id);
     /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
     /* モードを変更 */    WriteOperatingMode(id, mode);  //! RAMのデータが消えるので注意, Gain値のデフォルトも変わる．面倒な．．．
     /* ゲインを戻す */   // WriteGains(id, opt_gain_[id]);
     /* Profileを戻す*/  WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);
-    /* トルクを戻す */    WriteTorqueEnable(id, after);  // 動作中にこの関数が呼ばれることも考えて, TorqueOnは使わない
+    /* トルクを戻す */    WriteTorqueEnable(id, before);
     // 結果を確認
     bool is_changed = mode == ReadOperatingMode(id);
     if ( is_changed ) {
@@ -101,9 +103,10 @@ bool DynamixelHandler::StopRotation(uint8_t id){
     auto now_pos = ReadPresentPosition(id);
     cmd_values_[id][GOAL_POSITION]      = now_pos;
     state_values_[id][PRESENT_POSITION] = now_pos;
+    auto now_cur = ReadPresentCurrent(id);
     auto cur_lim = option_limit_[id][CURRENT_LIMIT];
-    auto now_cur = cmd_values_[id][GOAL_CURRENT];
-    auto cur = clamp(now_cur, -cur_lim/10, cur_lim/10); // ストールトルクの10%まで制限
+    auto cur_cmd = cmd_values_[id][GOAL_CURRENT];
+    auto cur = clamp(min(now_cur, cur_cmd), -cur_lim/10, cur_lim/10); // ストールトルクの10%まで制限
     if ( !WriteGoalPosition(id, now_pos)) return false; 
     if ( !WriteGoalVelocity(id, 0.0)    ) return false;
     if ( !WriteGoalCurrent (id, cur    )) return false;
@@ -136,9 +139,19 @@ bool DynamixelHandler::WriteHomingOffset(uint8_t id, double offset){
     return dyn_comm_.tryWrite(homing_offset, id, offset_pulse);
 }
 
+double DynamixelHandler::ReadPresentVelocity(uint8_t id){
+    auto vel_pulse = dyn_comm_.tryRead(present_velocity, id);
+    return present_velocity.pulse2val(vel_pulse, model_[id]);
+}
+
 bool DynamixelHandler::WriteGoalVelocity(uint8_t id, double vel){
     auto vel_pulse = goal_velocity.val2pulse(vel, model_[id]);
     return dyn_comm_.tryWrite(goal_velocity, id, vel_pulse);
+}
+
+double DynamixelHandler::ReadPresentCurrent(uint8_t id){
+    auto cur_pulse = dyn_comm_.tryRead(present_current, id);
+    return present_current.pulse2val(cur_pulse, model_[id]);
 }
 
 bool DynamixelHandler::WriteGoalCurrent(uint8_t id, double cur){
@@ -392,8 +405,9 @@ double DynamixelHandler::SyncReadOption_Limit(){
 void DynamixelHandler::CallBackDxlCommandFree(const dynamixel_handler::DynamixelCommandFree& msg) {
     auto id_list = msg.id_list; 
     if (id_list.empty()) for (auto id : id_list_) id_list.push_back(id);
+    ROS_INFO("Command [%s] is received", msg.command.c_str());
     if (msg.command == "clear")
-        for (auto id : id_list) ClearHardwareError(id);
+        for (auto id : id_list) { ClearHardwareError(id); TorqueOn(id);}
     if (msg.command == "enable") 
         for (auto id : id_list) TorqueOn(id);
     if (msg.command == "disable")
@@ -417,7 +431,7 @@ void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::Dy
         cmd_values_[id][GOAL_POSITION] = clamp(deg2rad(pos), limit[MIN_POSITION_LIMIT], limit[MAX_POSITION_LIMIT]);
         is_cmd_updated_[id] = true;
         list_write_cmd_.insert(GOAL_POSITION);
-        ChangeOperatingMode(id, OPERATING_MODE_POSITION);
+        ChangeOperatingMode(id, OPERATING_MODE_POSITION); // 副作用で変更する場合だけトルクが入ってしまう．
     }
     if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
 }

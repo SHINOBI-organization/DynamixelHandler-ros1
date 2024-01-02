@@ -86,20 +86,25 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     }
 
     // 最初の一回は全ての情報をread & publish
-    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlState();
-    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlError();
-    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlOption_Limit();
-    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlOption_Gain();
-    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) sleep_for(0.1s); BroadcastDxlOption_Mode();
+    while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) ros::Duration(0.05).sleep();
+    BroadcastDxlState();
+    while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) ros::Duration(0.05).sleep();
+    BroadcastDxlError();
+    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) ros::Duration(0.05).sleep();
+    BroadcastDxlOption_Limit();
+    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) ros::Duration(0.05).sleep();
+    BroadcastDxlOption_Gain();
+    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) ros::Duration(0.05).sleep();
+    BroadcastDxlOption_Mode();
 
     // サーボの初期化
     bool do_clean_hwerr, do_torque_on;
     if (!nh_p.getParam("init/hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
     if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
-        if ( do_clean_hwerr ) ClearHardwareError(id, TORQUE_DISABLE);
+        if ( do_clean_hwerr ) ClearHardwareError(id);
         if ( do_torque_on )   TorqueOn(id);
-        WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/);
+        WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/); // 一時的な処理
     }
 
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
@@ -143,25 +148,24 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     static int cnt = -1; cnt++;
     static float rtime=0, wtime=0, num_st_suc_p=1, num_st_suc_f=1, num_st_read=1;
 
-    
 /* 処理時間時間の計測 */ auto wstart = system_clock::now();
-
     //* topicをSubscribe & Dynamixelへ目標角をWrite
     SyncWriteCommandValues();
-
+    // ros::Duration(0.0002).sleep(); // 0.2ms待つ // 無くてもよさそう
 /* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 
-/* 処理時間時間の計測 */ auto rstart = system_clock::now();
 
     //* Dynamixelから状態Read & topicをPublish
     static double rate_suc_st = 0.0;
     if ( ratio_state_pub_!=0 ) 
     if ( rate_suc_st<1.0 || cnt % ratio_state_pub_ == 0 ) { //直前が失敗している場合 or ratio_state_pub_の割合で実行
+/* 処理時間時間の計測 */ auto rstart = system_clock::now();
         rate_suc_st = SyncReadStateValues();
         num_st_read++;
         num_st_suc_p += rate_suc_st > 0.0;
         num_st_suc_f += rate_suc_st > 1.0-1e-6;
         if ( rate_suc_st>0.0 ) BroadcastDxlState();
+/* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
     }
     if ( ratio_error_pub_!=0 )
     if ( cnt % ratio_error_pub_ == 0 ) { // ratio_error_pub_の割合で実行
@@ -178,19 +182,17 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
         if ( rate_suc_mode>0.0 ) BroadcastDxlOption_Mode();
     }
 
-/* 処理時間時間の計測 */ rtime += duration_cast<microseconds>(system_clock::now()-rstart).count() / 1000.0;
-
     //* デバック
     if ( ratio_mainloop_ !=0 ) 
     if ( cnt % ratio_mainloop_ == 0) {
         float partial_suc = 100*num_st_suc_p/num_st_read; float full_suc = 100*num_st_suc_f/num_st_read;
         char msg[100]; sprintf(msg, "Loop [%d]: read=%.2fms write=%.2fms success=%.0f%%(%.0f%%)",
-                                cnt, rtime/ratio_mainloop_, wtime/ratio_mainloop_, partial_suc, full_suc);
-        if (partial_suc > 99) ROS_INFO("%s", msg); else if (full_suc > 80) ROS_WARN("%s", msg); else ROS_ERROR("%s", msg);
-        /* 処理時間の計測を初期化 */rtime = wtime = 0.0; 
+                                cnt, rtime/num_st_read, wtime/ratio_mainloop_, partial_suc, full_suc);
+        if (full_suc < 80) ROS_ERROR("%s", msg); else if (partial_suc < 99) ROS_WARN("%s", msg); else ROS_INFO("%s", msg);
+        /* mainloopで行われてる処理の計測時間を初期化 */wtime = 0.0; 
     }
-    if ( cnt % max({loop_rate_, ratio_mainloop_, 10}) == 0) // 成功率の計測を初期化
-        num_st_suc_p = num_st_suc_f = num_st_read=0.00001;
+    if ( cnt % max({loop_rate_, ratio_mainloop_, 10}) == 0) // stateのreadの周期で行われてる処理の初期化
+        rtime = num_st_suc_p = num_st_suc_f = num_st_read=0.00001;
         
 }
 

@@ -22,8 +22,6 @@ using ros::Time;
 #include <dynamixel_handler/DynamixelCommand_X_ControlCurrentPosition.h>
 #include <dynamixel_handler/DynamixelCommand_X_ControlExtendedPosition.h>
 
-#include <thread>
-using std::this_thread::sleep_for;
 #include <string>
 using std::string;
 #include <chrono>
@@ -103,14 +101,16 @@ class DynamixelHandler {
         DynamixelHandler() = delete;
         //* 単体通信を組み合わせた上位機能
         static uint8_t ScanDynamixels(uint8_t id_max);
-        static bool ClearHardwareError(uint8_t servo_id, DynamixelTorquePermission after=TORQUE_ENABLE);
+        static bool ClearHardwareError(uint8_t servo_id);
         static bool TorqueOn(uint8_t servo_id);
         static bool TorqueOff(uint8_t servo_id);
         static bool StopRotation(uint8_t servo_id);
-        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode, DynamixelTorquePermission after=TORQUE_ENABLE);
+        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode);
         //* Dynamixel単体との通信による下位機能
         static uint8_t ReadHardwareError(uint8_t servo_id);
         static double  ReadPresentPosition(uint8_t servo_id);
+        static double  ReadPresentVelocity(uint8_t servo_id);
+        static double  ReadPresentCurrent(uint8_t servo_id);
         static double  ReadHomingOffset(uint8_t servo_id);
         static bool    ReadTorqueEnable(uint8_t servo_id);
         static uint8_t ReadOperatingMode(uint8_t servo_id);
