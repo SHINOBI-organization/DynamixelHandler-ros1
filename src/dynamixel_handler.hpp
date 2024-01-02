@@ -121,6 +121,7 @@ class DynamixelHandler {
         static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
         static bool WriteProfiles(uint8_t servo_id, double acceleration, double velocity);
+        static bool WriteBusWatchdog(uint8_t servo_id, double time);
     
         //* 各種のフラグとパラメータ
         static inline int  ratio_state_pub_  = 1; 

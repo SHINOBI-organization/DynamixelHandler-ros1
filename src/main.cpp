@@ -85,7 +85,14 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
         return false;
     }
 
+    // 状態のreadの前にやるべき初期化
+    for (auto id : id_list_) if (series_[id] == SERIES_X) {
+        WriteHomingOffset(id, 0.0); // 設定ファイルからとってこれるようにする
+        WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/); //  設定ファイルからとってこれるようにする
+    }
+
     // 最初の一回は全ての情報をread & publish
+    ROS_INFO("Reading present dynamixel state  ...");
     while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) ros::Duration(0.05).sleep();
     BroadcastDxlState();
     while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) ros::Duration(0.05).sleep();
@@ -97,14 +104,14 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) ros::Duration(0.05).sleep();
     BroadcastDxlOption_Mode();
 
-    // サーボの初期化
+    // 状態のreadの後にやるべき初期化
     bool do_clean_hwerr, do_torque_on;
     if (!nh_p.getParam("init/hardware_error_auto_clean",do_clean_hwerr)) do_clean_hwerr= true;
     if (!nh_p.getParam("init/torque_auto_enable",       do_torque_on  )) do_torque_on  = true;
+    ROS_INFO("Initializing dynamixel state  ...");
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         if ( do_clean_hwerr ) ClearHardwareError(id);
         if ( do_torque_on )   TorqueOn(id);
-        WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/); // 一時的な処理
     }
 
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
@@ -154,7 +161,6 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     // ros::Duration(0.0002).sleep(); // 0.2ms待つ // 無くてもよさそう
 /* 処理時間時間の計測 */ wtime += duration_cast<microseconds>(system_clock::now()-wstart).count() / 1000.0;
 
-
     //* Dynamixelから状態Read & topicをPublish
     static double rate_suc_st = 0.0;
     if ( ratio_state_pub_!=0 ) 
@@ -198,9 +204,9 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
 
 void DynamixelHandler::Terminate(int sig){
     ROS_INFO("Terminating DynamixelHandler ...");
-    ros::shutdown();
     dyn_comm_.set_retry_config(200, 5); // retryの設定を変更
     for(auto id : id_list_) StopRotation(id);
+    ros::shutdown();
 }
 
 #include <signal.h>

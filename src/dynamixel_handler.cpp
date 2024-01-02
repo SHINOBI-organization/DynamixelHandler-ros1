@@ -32,18 +32,22 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
     if ( ReadHardwareError(id) == 0b00000000 ) return true; // エラーがない場合は何もしない
 
-    auto now_pos = ReadPresentPosition(id);
-    int now_rot = (now_pos+M_PI) / (2*M_PI);
-    if (now_pos < -M_PI) now_rot--;
-
-    dyn_comm_.Reboot(id); //! RAMのデータが消えるので注意
-    ros::Duration(0.5).sleep(); // 0.5秒待つ
-
-    /* 回転数を戻す*/   WriteHomingOffset(id, now_rot*(2*M_PI));
-    /* gainを戻す*/    // WriteGains(id, opt_gain_[id]);
-    /* Profileを戻す*/ WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);
-
-    bool is_clear = ReadHardwareError(id) == 0b00000000;
+    const auto now_pos = ReadPresentPosition(id); // 失敗すると0が返って危ないので成功した場合だけリブート処理を行う
+    const bool pos_success = !dyn_comm_.timeout_last_read() && !dyn_comm_.comm_error_last_read();
+    const auto now_offset = ReadHomingOffset(id); // 失敗すると0が返って危ないので成功した場合だけリブート処理を行う
+    const bool offset_success = !dyn_comm_.timeout_last_read() && !dyn_comm_.comm_error_last_read();
+    if ( pos_success && offset_success ) {
+        int now_rot = (now_pos-now_offset+M_PI) / (2*M_PI);
+        if (now_pos < -M_PI) now_rot--;
+        const double offset = now_offset+now_rot*(2*M_PI);
+        dyn_comm_.Reboot(id); //** RAMのデータが消えるので注意
+                        // homing offsetが書き込めるまで待機する．
+        while ( !WriteHomingOffset(id, offset) && ros::ok() ) ros::Duration(0.01).sleep();
+        // WriteGains(id, opt_gain_[id]) 
+        WriteProfiles(id,  cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]); // 失敗しても気にしない
+    }
+    // 結果を確認
+    bool is_clear = (ReadHardwareError(id) == 0b00000000);
     if (is_clear) ROS_INFO ("ID [%d] is cleared error", id);
     else          ROS_ERROR("ID [%d] failed to clear error", id);
     return is_clear;
@@ -55,14 +59,14 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     if ( op_mode_[id] == mode ) return true; // 既に同じモードの場合は何もしない
     if ( fabs((when_op_mode_updated_[id] - Time::now()).toSec()) < 1.0 ) ros::Duration(1.0).sleep(); // 1秒以内に変更した場合は1秒待つ
     // 変更前のトルク状態を確認
-    bool before = ReadTorqueEnable(id);
-    /* トルクを一旦切る */ WriteTorqueEnable(id, TORQUE_DISABLE);
-    /* モードを変更 */    WriteOperatingMode(id, mode);  //! RAMのデータが消えるので注意, Gain値のデフォルトも変わる．面倒な．．．
-    /* ゲインを戻す */   // WriteGains(id, opt_gain_[id]);
-    /* Profileを戻す*/  WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);
-    /* トルクを戻す */    WriteTorqueEnable(id, before);
+    bool before = ReadTorqueEnable(id); // read失敗しても0が返ってくるので問題ない
+    WriteTorqueEnable(id, TORQUE_DISABLE);
+    WriteOperatingMode(id, mode);  //**RAMのデータが消えるので注意, Gain値のデフォルトも変わる．面倒な．．．
+    // WriteGains(id, opt_gain_[id]);
+    WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);  // 失敗しても気にしない
+    WriteTorqueEnable(id, before);
     // 結果を確認
-    bool is_changed = mode == ReadOperatingMode(id);
+    bool is_changed = (ReadOperatingMode(id) == mode);
     if ( is_changed ) {
         op_mode_[id] = mode;
         when_op_mode_updated_[id] = Time::now();
@@ -76,12 +80,15 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
 // モータを停止させてからトルクを入れる．
 bool DynamixelHandler::TorqueOn(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    // 角度の同期と速度の停止
-    if ( !StopRotation(id) ) return false;//この処理が失敗すると危険なので，トルク入れない．
-    // トルクを入れる
-    WriteTorqueEnable(id, TORQUE_ENABLE);
+    auto now_pos = ReadPresentPosition(id); // 失敗すると0が返って危ないので確認する
+    if ( !( dyn_comm_.timeout_last_read() || dyn_comm_.comm_error_last_read() )){
+        cmd_values_[id][GOAL_POSITION] = now_pos; // トルクがオフならDynamixel本体のgoal_positionはpresent_positionと一致しているので
+        cmd_values_[id][GOAL_VELOCITY] = 0.0;     // goal_velocity, goal_currentはともに0担っている．
+        cmd_values_[id][GOAL_CURRENT]  = 0.0;     // こちら側のgoal値も上記と同様にしないと，トルクオン時に急激な動きをして危険．
+        WriteTorqueEnable(id, TORQUE_ENABLE);
+    }
     // 結果を確認
-    bool is_enable = TORQUE_ENABLE == ReadTorqueEnable(id);
+    bool is_enable = (ReadTorqueEnable(id) == TORQUE_ENABLE);
     if ( !is_enable ) ROS_ERROR("ID [%d] failed to enable torque", id);
     return is_enable;
 }
@@ -92,7 +99,7 @@ bool DynamixelHandler::TorqueOff(uint8_t id){
     // トルクを切る
     WriteTorqueEnable(id, TORQUE_DISABLE);
     // 結果を確認
-    bool is_disable = TORQUE_DISABLE == ReadTorqueEnable(id);
+    bool is_disable = (ReadTorqueEnable(id) == TORQUE_DISABLE);
     if ( !is_disable ) ROS_ERROR("ID [%d] failed to disable torque", id);
     return is_disable;
 }
@@ -100,16 +107,10 @@ bool DynamixelHandler::TorqueOff(uint8_t id){
 // モータの動作を停止させる．
 bool DynamixelHandler::StopRotation(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
-    auto now_pos = ReadPresentPosition(id);
-    cmd_values_[id][GOAL_POSITION]      = now_pos;
-    state_values_[id][PRESENT_POSITION] = now_pos;
-    auto now_cur = ReadPresentCurrent(id);
-    auto cur_lim = option_limit_[id][CURRENT_LIMIT];
-    auto cur_cmd = cmd_values_[id][GOAL_CURRENT];
-    auto cur = clamp(min(now_cur, cur_cmd), -cur_lim/10, cur_lim/10); // ストールトルクの10%まで制限
-    if ( !WriteGoalPosition(id, now_pos)) return false; 
-    if ( !WriteGoalVelocity(id, 0.0)    ) return false;
-    if ( !WriteGoalCurrent (id, cur    )) return false;
+    WriteHomingOffset(id, 0.0); // マジで謎だが，BusWatchdogを設定するとHomingOffset分だけ回転してしまう...多分ファームrウェアのバグ
+    WriteBusWatchdog(id, 20 /*ms*/);
+    ros::Duration(0.02).sleep();
+    WriteBusWatchdog(id, 0); // 無効化
     return true;
 }
 
@@ -180,6 +181,11 @@ bool DynamixelHandler::WriteProfiles(uint8_t id, double acc, double vel){
     auto acc_pulse = profile_acceleration.val2pulse(acc, model_[id]);
     return dyn_comm_.tryWrite(profile_velocity, id, vel_pulse)
         && dyn_comm_.tryWrite(profile_acceleration, id, acc_pulse);
+}
+
+bool DynamixelHandler::WriteBusWatchdog(uint8_t id, double time){
+    auto time_pulse = bus_watchdog.val2pulse(time, model_[id]);
+    return dyn_comm_.tryWrite(bus_watchdog, id, time_pulse);
 }
 
 // bool DynamixelHandler::WriteGains(uint8_t id, array<int64_t, 7> gains){
