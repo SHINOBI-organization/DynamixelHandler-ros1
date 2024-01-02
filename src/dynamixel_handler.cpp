@@ -49,11 +49,9 @@ bool DynamixelHandler::ClearHardwareError(uint8_t id){
         int now_rot = (now_pos-now_offset+M_PI) / (2*M_PI);
         if (now_pos < -M_PI) now_rot--;
         const double offset = now_offset+now_rot*(2*M_PI);
-        dyn_comm_.Reboot(id); //** RAMのデータが消えるので注意
+        dyn_comm_.Reboot(id); //** RAMのデータが消えるが，この処理の後は電源喪失と同じ扱いなので，ここでは気にしない．
         // homing offsetが書き込めるまで待機する．
         while ( !WriteHomingOffset(id, offset) && ros::ok() ) rsleep(0.01);
-        // WriteGains(id, opt_gain_[id]) 
-        WriteProfiles(id,  cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]); // 失敗しても気にしない
     }
     // 結果を確認
     bool is_clear = (ReadHardwareError(id) == 0b00000000);
@@ -70,9 +68,15 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
     // 変更前のトルク状態を確認
     const bool before = ReadTorqueEnable(id); // read失敗しても0が返ってくるので問題ない
     WriteTorqueEnable(id, TORQUE_DISABLE);
-    WriteOperatingMode(id, mode);  //**RAMのデータが消えるので注意, Gain値のデフォルトも変わる．面倒な．．．
-    // WriteGains(id, opt_gain_[id]);
-    WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]);  // 失敗しても気にしない
+    /*モード変更*/WriteOperatingMode(id, mode);  //**RAMのデータが消えるので注意, これは電源喪失とは異なるのでRAMデータの回復を入れる
+    // cmd_values_を全部書き込んで，本体とこのプログラムの同期行う．
+    WriteGoalPWM(id, cmd_values_[id][GOAL_PWM]);
+    WriteGoalCurrent(id, cmd_values_[id][GOAL_CURRENT]);
+    WriteGoalVelocity(id, cmd_values_[id][GOAL_VELOCITY]);
+    WriteProfileAcc(id, cmd_values_[id][PROFILE_ACC]);
+    WriteProfileVel(id, cmd_values_[id][PROFILE_VEL]);
+    WriteGoalPosition(id, cmd_values_[id][GOAL_POSITION]);
+    // WriteGains(id, opt_gain_[id]);　// ** Gain値のデフォルトも変わる．面倒な．．．
     WriteTorqueEnable(id, before);
     // 結果を確認
     bool is_changed = (ReadOperatingMode(id) == mode);
@@ -91,14 +95,23 @@ bool DynamixelHandler::ChangeOperatingMode(uint8_t id, DynamixelOperatingMode mo
 // モータを停止させてからトルクを入れる．
 bool DynamixelHandler::TorqueOn(uint8_t id){
     if ( series_[id] != SERIES_X ) return false; // Xシリーズ以外は対応していない
+    // dynamixel内のgoal値とこのプログラム内のcmd_values_を一致させる．
     const auto now_pos = ReadPresentPosition(id); // 失敗すると0が返って危ないので確認する
     if ( !( dyn_comm_.timeout_last_read() || dyn_comm_.comm_error_last_read() )){
-        cmd_values_[id][GOAL_POSITION] = now_pos; // トルクがオフならDynamixel本体のgoal_positionはpresent_positionと一致しているので
-        cmd_values_[id][GOAL_VELOCITY] = 0.0;     // goal_velocity, goal_currentはともに0担っている．
-        cmd_values_[id][GOAL_CURRENT]  = 0.0;     // こちら側のgoal値も上記と同様にしないと，トルクオン時に急激な動きをして危険．
-        // WriteGains(id, opt_gain_[id]); // 電源喪失時に消えるデータを書き込む
-        WriteProfiles(id, cmd_values_[id][PROFILE_ACC], cmd_values_[id][PROFILE_VEL]); // 電源喪失時に消えるデータを書き込む
-        WriteTorqueEnable(id, TORQUE_ENABLE);
+        // 急に動き出さないように，以下のcmd_values_を設定する
+        cmd_values_[id][GOAL_POSITION] = now_pos; // トルクがオフならDynamixel本体のgoal_positionはpresent_positionと一致している．
+        if (op_mode_[id]==OPERATING_MODE_VELOCITY) cmd_values_[id][GOAL_VELOCITY] = 0.0;
+        if (op_mode_[id]==OPERATING_MODE_CURRENT ) cmd_values_[id][GOAL_CURRENT]  = 0.0;
+        if (op_mode_[id]==OPERATING_MODE_PWM     ) cmd_values_[id][GOAL_PWM]      = 0.0;
+        // cmd_values_を全部書き込んで，本体とこのプログラムの同期行う．
+        WriteGoalPWM(id, cmd_values_[id][GOAL_PWM]);
+        WriteGoalCurrent(id, cmd_values_[id][GOAL_CURRENT]);
+        WriteGoalVelocity(id, cmd_values_[id][GOAL_VELOCITY]);
+        WriteProfileAcc(id, cmd_values_[id][PROFILE_ACC]);
+        WriteProfileVel(id, cmd_values_[id][PROFILE_VEL]);
+        WriteGoalPosition(id, cmd_values_[id][GOAL_POSITION]);
+        // WriteGains(id, opt_gain_[id]); 　// その他電源喪失時に消えるデータを念のため書き込む
+        /*トルクを入れる*/WriteTorqueEnable(id, TORQUE_ENABLE);
     }
     // 結果を確認
     bool is_enable = (ReadTorqueEnable(id) == TORQUE_ENABLE);
@@ -179,11 +192,19 @@ bool DynamixelHandler::WriteOperatingMode(uint8_t id, uint8_t mode){
     return dyn_comm_.tryWrite(operating_mode, id, mode); 
 }
 
-bool DynamixelHandler::WriteProfiles(uint8_t id, double acc, double vel){
+bool DynamixelHandler::WriteGoalPWM(uint8_t id, double pwm){
+    auto pwm_pulse = goal_pwm.val2pulse(pwm, model_[id]);
+    return dyn_comm_.tryWrite(goal_pwm, id, pwm_pulse);
+}
+
+bool DynamixelHandler::WriteProfileVel(uint8_t id, double vel){
     auto vel_pulse = profile_velocity.val2pulse(vel, model_[id]);
+    return dyn_comm_.tryWrite(profile_velocity, id, vel_pulse);
+}
+
+bool DynamixelHandler::WriteProfileAcc(uint8_t id, double acc){
     auto acc_pulse = profile_acceleration.val2pulse(acc, model_[id]);
-    return dyn_comm_.tryWrite(profile_velocity, id, vel_pulse)
-        && dyn_comm_.tryWrite(profile_acceleration, id, acc_pulse);
+    return dyn_comm_.tryWrite(profile_acceleration, id, acc_pulse);
 }
 
 bool DynamixelHandler::WriteBusWatchdog(uint8_t id, double time){

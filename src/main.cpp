@@ -88,7 +88,8 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     for (auto id : id_list_) if (series_[id] == SERIES_X) {
         WriteBusWatchdog(id, 0);
         WriteHomingOffset(id, 0.0); // 設定ファイルからとってこれるようにする
-        WriteProfiles(id, 10.0/*rad/s^2*/, 0.9/*rad/s*/); //  設定ファイルからとってこれるようにする
+        WriteProfileAcc(id, 10.0); //  設定ファイルからとってこれるようにする
+        WriteProfileVel(id,  0.9); //  設定ファイルからとってこれるようにする
     }
 
     // 最初の一回は全ての情報をread & publish

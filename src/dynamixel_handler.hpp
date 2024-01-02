@@ -114,13 +114,15 @@ class DynamixelHandler {
         static double  ReadHomingOffset(uint8_t servo_id);
         static bool    ReadTorqueEnable(uint8_t servo_id);
         static uint8_t ReadOperatingMode(uint8_t servo_id);
-        static bool WriteGoalPosition(uint8_t servo_id, double position);
-        static bool WriteGoalVelocity(uint8_t servo_id, double velocity);
+        static bool WriteGoalPWM(uint8_t servo_id, double pwm);
         static bool WriteGoalCurrent(uint8_t servo_id, double current);
+        static bool WriteGoalVelocity(uint8_t servo_id, double velocity);
+        static bool WriteProfileAcc(uint8_t servo_id, double acceleration);
+        static bool WriteProfileVel(uint8_t servo_id, double velocity);
+        static bool WriteGoalPosition(uint8_t servo_id, double position);
         static bool WriteHomingOffset(uint8_t servo_id, double offset);
         static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
-        static bool WriteProfiles(uint8_t servo_id, double acceleration, double velocity);
         static bool WriteBusWatchdog(uint8_t servo_id, double time);
     
         //* 各種のフラグとパラメータ
