@@ -17,12 +17,12 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
  - ROS topic の pub/sub のみでDynamixelを制御可能
    - 指定した周期で指定した情報を state topic としてpub (デフォルト: 電流/速度/位置, 50Hz)
    - 指定した周期でハードウェアエラーを error topic としてpub (デフォルト: 0.5Hz)
-   - subした command topic に合わせて制御モードを自動で変更 (電流/速度/位置/電流制限付き位置/拡張位置制御に対応)
+   - subした command topic に合わせて制御モードを自動で変更 (PWM制御は非対応)
    - sub/pubされる情報はパルス値ではなく物理量
-   - ユーザは純粋にサーボの目標状態(角度/速度など)を指令するだけでサーボを制御でき，  
-     また，同様にサーボの現在状態(角度/速度)を受け取れる
+   - ユーザは純粋にサーボの目標状態を指令するだけでサーボを制御でき，  
+     また，同様にサーボの現在状態を受け取れる
  - 比較的高速なRead/Writeを実現 (12サーボに電流/速度/位置を Read/Write しても150Hzくらいは出せる)
-   - 複数のアドレスを一括で読み書き & 複数のサーボを同時に読み書き(SyncRead/SyncWrite) によって Read 回数を抑える
+   - 複数のアドレスを一括で読み書き & 複数のサーボを同時に読み書き(SyncRead/SyncWrite) によって Serial通信の回数を抑える
    - Fast Sync Read インストラクションを活用して Read を高速化
    - Raed/Write は ROS node の周期と同期しているので，topicのcallbackに左右されない．
    - ※ 適切な`LATENCY_TIMER`の設定が必要(2 ~ 4msくらい)
@@ -31,8 +31,7 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
  - 初期化時にエラーを自動でクリア
  - エラークリア時の回転数消失問題を homing offset により自動補正
  - ros param から各種 log 表示の制御が可能
-   - Serial通信のエラー率
-   - Serial通信の Read/Write にかかる平均時間
+   - Read/Write にかかる平均時間とSerial通信の成功率
    - Read/Write されるパルス値
    - Readに失敗したID
    - etc...
@@ -41,10 +40,22 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
 
 ### 未実装機能
  - 精度に合わせてpubする値を丸める
- - profile_velocity_とprofile_accelerationを command topic から設定できるようにする
- - 各種のlimitをsub/pubできるようにする
- - 各種のgainをsub/pubできるようにする
- - 各種のmodeをsub/pubできるようにする
+ - profile_velocity_とprofile_acceleration
+   - 書き込みは実装できているので，command topic から設定できるようにする
+   - 電源喪失・モードチェンジ・Rebootで初期化されていしまう問題への対処
+ - limit系
+   - paramからの設定ができるようにする
+   - pubできるようにする
+   - （subによる動的な設定はできなくていいか？）
+ - gain系
+   - paramから設定できるようにする
+   - pubできるようにする
+   - 電源喪失・Rebootで初期化されていしまう問題の対処
+   - モード変更によってモードごとのデフォルト値に初期化される問題の対処
+     - FW ver 45 以上で使えるresotre_configurationだと，バックアップ作成時点の値になってしまい，意図と異なる場合が発生しかねない． 
+ - mode系
+   - paramから設定できるようにする
+   - pubできるようにする
  - commnad topic を service にする
  - baudrate を統一し一括変更できる sub node を作成する
  - 電流/速度制御時に通信が途切れたら自動で停止するようにする
@@ -344,6 +355,8 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
  - profile_acceleration : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
  - profile_velocity    : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
 
+note: 制御モードが変わると勝手に0に変更されてしまう．対策済み．
+
 ### 制限 
  - temperature_limit  : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
  - max_voltage_limit     : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
@@ -363,7 +376,9 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
  - position_p_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
  - feedforward_acc_gain  : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
  - feedforward_vel_gain  : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
-   
+
+note: 制御モードによってデフォルト値が異なり，なんとモードを変えると勝手に書き換えられてしまう．制御モードをまたぐ場合の処理については検討中．
+
 ### External Ports
  - external_port_mode_{x} : 未実装，topicから制御できるようにする．
  - external_port_data_{x} : 未実装，topicから制御できるようにする．
@@ -383,11 +398,15 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 
 ### 設定
  - return_delay_time      : not support
- - homing_offset          : ユーザーは使用不可，reboot時の角度補正に用いられる．
+ - homing_offset          : ユーザーは使用不可，初期化時に0に設定され，reboot時の角度補正に用いられる．
  - moving_threshold       : not support
+ - startup_configuration  : not support, buckupがあるときPIDゲインやprofile系の値を自動で復元してくれるが，PIDのデフォルト値がモードによって異なる問題があるので使わない．
  - shutdown               : not support
  - status_return_level    : not support, 常に2を前提とする
- - bus_watchbdog          : 未実装，current/velocity control時に一定時間通信切れで自動停止するようにする．
+ - bus_watchbdog          : node kill時にサーボを自動停止させる機能に用いられる．   
+未実装，current/velocity control時に一定時間通信切れで自動停止するようにする．
+
+note: (bus_watchdog の設定値が1以上の時) bus_watchdogの設定値 × 20ms 通信がないと自動で動作停止処理が実行される．homing_offset が設定されている状態でこの動作停止処理が走るとなぜか homing_offsetだけ回転する．
 
 ### その他
  - led                    : not support
@@ -401,17 +420,14 @@ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 ## 速度に関してメモ
 
 ### Sync Read vs Fast Sync Read("use_fast_read"パラメータ)
-結論としては，低レイテンシタイマーだとFastの方がよい．
+結論としては，読み込むデータとサーボの数が少ないならFastを使う方がよい．
 
-自分環境だとレイテンシタイマーが大きいとあまり違いを感じなかった．
-しかし，速度を上げるためにレイテンシタイマーを小さくすると Sync Read の失敗率がかなり大きくなった．
-サーボから順番にパケットが送られてくるため，後半のサーボからのパケットがタイムアウトしてしまう用だった．
-14サーボ直列だと，lib_dynamixel側のLATENCY_TIMER=6ms, デバイス側のlatency timer=2msが，Sync Readの限界だった．
-Fast Sync Read だとlib_dynamixel側のLATENCY_TIMER=2ms, デバイス側のlatency timer=2msまで行けた．
-この領域での6msと2msの差は大きく，200Hz以上で回そうと思うとFast Sync Readが必須という感じである．
+Fast Sync Readは受信するパケットが全サーボ分1つながりになっている．
+つまり1回の通信でやり取りするパケット数が少なくなるので，同時に読み書きするサーボが多くなると速度に違いが出てくる．
+少なくとも10サーボくらいで顕著にFast Sync Readの方が早くなる．
 
-Fast側のデメリットとしては，直列しているサーボのどこかで断線等が起きた場合に弱いという点が挙げられる．
-Fastはパケットがつながっているため，1つでも返事をしないサーボがあるとパケットが全滅してしまう．
+Fast Sync Read側のデメリットとしては，直列しているサーボのどこかで断線等が起きた場合に弱いという点が挙げられる．
+Fast Sync Readはパケットがつながっているため，1つでも返事をしないサーボがあるとパケットが全滅してしまう．
 （これはlib_dynamixelのパケット処理の実装が悪いかもしれないが，知識不足ですぐに改善できなさそう．）
 通常のSync Readはパケットが独立しているため，断線するより前のサーボからの返事は受け取ることができる．
 断線や接続不良が危惧されるような状況では通信周期を犠牲にして，Sync Readを使わざるを得ないだろう．
@@ -421,9 +437,9 @@ Fastはパケットがつながっているため，1つでも返事をしない
 すなわち"use_split_read"は`false`を推奨する．
 
 複数のアドレスからデータを読み込みたいとき，分割して読み込む場合はシリアル通信の処理時間が，アドレス数分だけ長くなる．
-100Hz以上で回そうと思うと，present_current, present_velocity, present_positionという基本の3つを分割して取り出すだけでもきつい．
-自分の環境では，前述の3つくらいの同時読み込みであれば，120Hz~180Hzくらいでる．200Hzは場合によって出るか出ないかというところ．
-分割読み込みでは80Hzくらいで頭打ちとなってしまった．
+100Hz以上で回そうと思うと，present_current, present_velocity, present_positionという基本の3つを取り出すだけでもきつい．
+自分の環境では，前述の3つくらいの同時読み込みであれば，120~180Hzくらいでる．200Hzは場合によって出るか出ないかというところ．
+分割読み込みでは60~80Hzくらいで頭打ちとなってしまった．
 present系の8つのアドレスすべてから読み込んでも，同時読み込みなら100Hzくらいはでる．
 分割読み込みだと30Hzも怪しい．
 
@@ -440,11 +456,6 @@ present系の8つのアドレスすべてから読み込んでも，同時読み
 書き込みに関しては，分割して行っても処理時間はほぼ変わらない(1ms未満しか遅くならない)ので，基本は`true`としておくべき．
 
 ### その他
-色々試したが，Writeを100Hzくらいでやるとすると，"loop_rate"=200, "ratio_read_state"=2がちょうどよさそう．
+色々試したが，"loop_rate"=200, "ratio_read_state"=2がちょうどよさそう．
 （全体周期200Hzで，そのうち2回に1回Readするので，readは100Hz）
 これ以上readの周期を上げようとするとCPU使用率が高くなりすぎる．
-また，通信の失敗率(time out)が高くなりすぎる．
-
-追記  
-Writeによって，Readのtime outが発生していたのは，Writeの直後にReadを同期的に行っていたためだった模様．
-とりあえずWrite直後に0.5msのsleepを入れたら改善して，"loop_rate"=300, "ratio_read_state"=2まで行けた．
