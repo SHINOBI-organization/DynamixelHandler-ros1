@@ -402,7 +402,6 @@ double DynamixelHandler::SyncReadOption_Limit(){
         : dyn_comm_.SyncRead     (opt_limit_dp_list, target_id_list);
     const bool is_timeout   = dyn_comm_.timeout_last_read();
     const bool has_comm_err = dyn_comm_.comm_error_last_read();
-
     // 通信エラーの表示
     if ( varbose_read_opt_err_ ) if ( has_comm_err || is_timeout ) {
         vector<uint8_t> failed_id_list;
@@ -411,22 +410,33 @@ double DynamixelHandler::SyncReadOption_Limit(){
         auto ss = id_list_layout(failed_id_list, string(header) + (is_timeout? " (time out)" : " (some kind packet error)"));
         ROS_WARN_STREAM(ss);
     }
+    // ACCELERATION_LIMITに関してだけ修正を入れる．0はほぼあり得ないかつ0の時profile_accの設定ができないので，適当に大きな値に変更する．
+    vector<uint8_t> fixed_id_list;
+    for (auto pair : id_limit_vec_map) {
+        const uint8_t id = pair.first;
+        const int64_t acc = pair.second[ACCELERATION_LIMIT];
+        if ( acc != 0 ) continue;
+        fixed_id_list.push_back(id);
+        id_limit_vec_map[id][ACCELERATION_LIMIT] = 32767;
+    }
     // id_limit_vec_mapの中身を確認
     if ( varbose_read_opt_ ) if ( id_limit_vec_map.size()>0 ) {
         char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_limit_vec_map.size());
         auto ss = control_table_layout(width_log_, id_limit_vec_map, opt_limit_dp_list, string(header));
         ROS_INFO_STREAM(ss);
-        double tmp = id_limit_vec_map.size() / (double)target_id_list.size();
-        ROS_INFO("Success rate: %f", tmp);
+        if ( !fixed_id_list.empty() ) {
+            char header[100]; sprintf(header,"\n[%d] servo(s)' accelerarion_limit is 0, change to 32767", (int)fixed_id_list.size());
+            auto ss = id_list_layout(fixed_id_list, string(header));
+            ROS_WARN_STREAM(ss);
+        }
     }
-
     // option_limit_に反映
     for ( auto opt_lim=0; opt_lim<opt_limit_dp_list.size(); opt_lim++) {
         DynamixelAddress dp = opt_limit_dp_list[opt_lim];
         for (auto pair : id_limit_vec_map) {
             const uint8_t id = pair.first;
             const int64_t data_int = pair.second[opt_lim];
-            option_limit_[id][opt_lim] = dp.pulse2val( data_int, model_[id]);
+            option_limit_[id][opt_lim] = dp.pulse2val( data_int, model_[id] );
         }
     }
     return id_limit_vec_map.size() / (double)target_id_list.size();
@@ -455,7 +465,28 @@ void DynamixelHandler::CallBackDxlCommand(const dynamixel_handler::DynamixelComm
 }
 
 void DynamixelHandler::CallBackDxlCommand_Profile(const dynamixel_handler::DynamixelCommand_Profile& msg) {
+    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_Profile"); // msg.id_listと同じサイズの奴だけ処理する
+    const bool do_process_vel = msg.id_list.size() == msg.profile_velocity__deg_s.size();
+    const bool do_process_acc = msg.id_list.size() == msg.profile_acceleration__deg_ss.size();
+    if ( !do_process_vel && !do_process_acc ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
+    for (int i=0; i<msg.id_list.size(); i++){
+        int id = msg.id_list[i];
+        auto limit = option_limit_[id];
+        if ( do_process_vel ){
+            auto vel = msg.profile_velocity__deg_s[i];
+            cmd_values_[id][PROFILE_VEL] = clamp( deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT] );
+            is_cmd_updated_[id] = true;
+            list_write_cmd_.insert(PROFILE_VEL);
+        }
+        if ( do_process_acc ){
+            auto acc = msg.profile_acceleration__deg_ss[i];
+            cmd_values_[id][PROFILE_ACC] = clamp( deg2rad(acc), -limit[ACCELERATION_LIMIT], limit[ACCELERATION_LIMIT] );
+            is_cmd_updated_[id] = true;
+            list_write_cmd_.insert(PROFILE_ACC);
+        }
+    }
+    if (varbose_callback_) ROS_INFO(" - %d servo(s) profile are updated", (int)msg.id_list.size());
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
@@ -525,7 +556,7 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
         if ( do_process_cur ){
             auto cur = msg.current__mA[i];
             is_cmd_updated_[id] = true;
-            cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
+            cmd_values_[id][GOAL_CURRENT] = clamp(cur, 0.0, limit[CURRENT_LIMIT]);
             list_write_cmd_.insert(GOAL_CURRENT);
         }
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
