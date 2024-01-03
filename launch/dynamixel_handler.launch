@@ -15,7 +15,8 @@
     <!-- <env name="ROSCONSOLE_FORMAT" value="${function}: ${message}"/> -->
     
     <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
-    <arg name="BAUDRATE" default="1000000"/>
+    <arg name="BAUDRATE" default="2000000"/>
+    <arg name="LATENCY_TIMER" default="2"/>
 
     <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
         <!-- トピックの設定 -->
@@ -39,8 +40,9 @@
         <remap from="/dynamixel/option/mode/r"  to="/dynamixel/option/mode/r" />
 
         <!-- 通信の設定 -->
-        <param name="device_name" value="$(arg DEVICE_NAME)"/>
-        <param name="baudrate" value="$(arg BAUDRATE)"/>
+        <param name="device_name"   value="$(arg DEVICE_NAME)"/>
+        <param name="baudrate"      value="$(arg BAUDRATE)"/>
+        <param name="latency_timer" value="$(arg LATENCY_TIMER)"/>
         <param name="dyn_comm/retry_num"      value="10"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
         <param name="dyn_comm/inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
         <param name="dyn_comm/varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
@@ -50,13 +52,14 @@
         <param name="init/expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
         <param name="init/hardware_error_auto_clean" value="true"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
         <param name="init/torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
+        <param name="term/torque_auto_disable"       value="true"/>  <!-- 終了時に Torque を自動でOFFにするかどうか -->
 
         <!-- ループの設定 -->
-        <param name="loop_rate" value="200"/>
+        <param name="loop_rate" value="400"/>
         <param name="ratio/state_read"   value="2"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
         <param name="ratio/option_read"  value="500"/>    <!-- この回数に一回 option を読み取る, 0=初回のみ -->
         <param name="ratio/error_read"   value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
-        <param name="ratio/varbose_loop" value="100"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
+        <param name="ratio/varbose_loop" value="200"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
         
         <!-- Read/Write方式 -->
         <param name="use/fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
@@ -81,7 +84,7 @@
         <param name="varbose/read_state/raw"  value="false"/> <!-- 読み込んだstateデータのpulse値を出力 -->
         <param name="varbose/read_state/err"  value="false"/>  <!-- stateデータの読み込みエラーを出力 -->
         <param name="varbose/read_option/raw" value="false"/> <!-- 読み込んだoptionデータのpulse値を出力 -->
-        <param name="varbose/read_option/err" value="true"/>  <!-- optionデータの読み込みエラーを出力 -->
+        <param name="varbose/read_option/err" value="false"/>  <!-- optionデータの読み込みエラーを出力 -->
         <param name="varbose/read_hardware_error"   value="true"/>  <!-- 検出したHardware errorを出力 -->
     </node>
 
