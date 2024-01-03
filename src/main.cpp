@@ -29,10 +29,11 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     ros::NodeHandle nh_p("~");
 
     // 通信の開始
-    int baudrate; string device_name;
-    if (!nh_p.getParam("baudrate",         baudrate   ) ) baudrate    =  1000000;
+    int baudrate, latency_timer; string device_name;
+    if (!nh_p.getParam("baudrate",         baudrate   ) ) baudrate    =  57600;
     if (!nh_p.getParam("device_name",      device_name) ) device_name = "/dev/ttyUSB0";
-    dyn_comm_ = DynamixelComunicator(device_name.c_str(), baudrate);
+    if (!nh_p.getParam("latency_timer",    latency_timer) ) latency_timer = 16;
+    dyn_comm_ = DynamixelComunicator(device_name.c_str(), baudrate, latency_timer);
     if ( !dyn_comm_.OpenPort() ) {
         ROS_ERROR("Failed to open USB device [%s]", dyn_comm_.port_name().c_str()); 
         return false;
