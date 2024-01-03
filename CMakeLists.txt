@@ -191,6 +191,20 @@ add_executable(dynamixel_handler_node
   ${catkin_LIBRARIES}
 )
 
+add_executable(dynamixel_change_baudrate_node 
+	include/mylib_dynamixel/download/port_handler_linux_fix.cpp
+	include/mylib_dynamixel/download/port_handler_fix.cpp
+	include/mylib_dynamixel/src/dynamixel_communicator_main.cpp
+	include/mylib_dynamixel/src/dynamixel_communicator_retry.cpp
+	
+	src/dynamixel_handler.cpp
+	src/sub.cpp
+)
+
+ target_link_libraries(dynamixel_change_baudrate_node
+  ${catkin_LIBRARIES}
+)
+
 #############
 ## Install ##
 #############
