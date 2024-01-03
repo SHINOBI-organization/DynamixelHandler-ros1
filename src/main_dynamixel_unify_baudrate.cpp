@@ -1,5 +1,5 @@
 #include <ros/ros.h>
-#include "dynamixel_handler.hpp"
+#include "dynamixel_communicator.h"
 
 #include <signal.h>
 

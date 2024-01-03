@@ -99,9 +99,10 @@ class DynamixelHandler {
 
     private:
         DynamixelHandler() = delete;
-        //* 単体通信を組み合わせた上位機能
-        static void StopDynamixels();
+		  //* 初期化と終了処理で使う
         static uint8_t ScanDynamixels(uint8_t id_max);
+        static void StopDynamixels();
+        //* 単体通信を組み合わせた上位機能
         static bool ClearHardwareError(uint8_t servo_id);
         static bool TorqueOn(uint8_t servo_id);
         static bool TorqueOff(uint8_t servo_id);
