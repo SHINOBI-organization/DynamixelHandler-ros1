@@ -16,7 +16,7 @@ int main(int argc, char **argv) {
     if (!nh_p.getParam("device_name",      device_name   )) device_name = "/dev/ttyUSB0";
     if (!nh_p.getParam("prev_baudrate",    baudrate_prev )) baudrate_prev  = 57600;
     if (!nh_p.getParam("after_baudrate",   baudrate_after)) baudrate_after = 1000000;
-    auto dyn_comm = DynamixelComunicator(device_name.c_str(), baudrate_prev, 16);
+    auto dyn_comm = DynamixelCommunicator(device_name.c_str(), baudrate_prev, 16);
     if ( !dyn_comm.OpenPort() ) {
         ROS_ERROR("Failed to open USB device [%s]", dyn_comm.port_name().c_str()); 
         return false;

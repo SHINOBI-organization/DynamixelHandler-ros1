@@ -145,7 +145,7 @@ class DynamixelHandler {
         static inline bool varbose_read_opt_err_ = false;
 
         //* Dynamixelとの通信
-        static inline DynamixelComunicator dyn_comm_;
+        static inline DynamixelCommunicator dyn_comm_;
 
         //* Dynamixelを扱うための変数群 
         enum CmdValueIndex { //　cmd_values_のIndex, サーボに毎周期で書き込むことができる値
