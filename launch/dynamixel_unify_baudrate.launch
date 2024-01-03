@@ -1,0 +1,27 @@
+<launch>
+
+    <env name="ROSCONSOLE_FORMAT" value="[${time}] ${message}"/>
+    
+    <!-- 指定可能なボーレート
+        9600    
+        57600   
+        115200  
+        1000000 
+        2000000 
+        3000000 
+        4000000 
+     -->
+    <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
+    <arg name="TARGET_BAUDRATE" default="2000000"/>
+
+    <node pkg="dynamixel_handler" name="dxl_unify_baudrate" type="dynamixel_unify_baudrate_node" output="screen">
+        <param name="target_baudrate" value="$(arg TARGET_BAUDRATE)"/>
+        <param name="device_name"     value="$(arg DEVICE_NAME)"/>
+        <param name="latency_timer"   value="4"/>
+        <param name="min_id" value="0"/>
+        <param name="max_id" value="45"/>
+        <param name="min_search_baudrate" value="9600"/>
+        <param name="max_search_baudrate" value="2000000"/>
+    </node>
+
+</launch>
