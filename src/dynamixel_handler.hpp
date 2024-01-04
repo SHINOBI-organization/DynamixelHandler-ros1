@@ -99,30 +99,36 @@ class DynamixelHandler {
 
     private:
         DynamixelHandler() = delete;
-		  //* 初期化と終了処理で使う
+        //* 単体通信を組み合わせた上位機能
         static uint8_t ScanDynamixels(uint8_t id_max);
         static void StopDynamixels();
-        //* 単体通信を組み合わせた上位機能
         static bool ClearHardwareError(uint8_t servo_id);
+        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode);
         static bool TorqueOn(uint8_t servo_id);
         static bool TorqueOff(uint8_t servo_id);
-        static bool ChangeOperatingMode(uint8_t servo_id, DynamixelOperatingMode mode);
         //* Dynamixel単体との通信による下位機能
         static uint8_t ReadHardwareError(uint8_t servo_id);
-        static double  ReadPresentPosition(uint8_t servo_id);
-        static double  ReadPresentVelocity(uint8_t servo_id);
-        static double  ReadPresentCurrent(uint8_t servo_id);
-        static double  ReadHomingOffset(uint8_t servo_id);
         static bool    ReadTorqueEnable(uint8_t servo_id);
+        static double  ReadPresentPWM(uint8_t servo_id);
+        static double  ReadPresentCurrent(uint8_t servo_id);
+        static double  ReadPresentVelocity(uint8_t servo_id);
+        static double  ReadPresentPosition(uint8_t servo_id);
+        static double  ReadGoalPWM(uint8_t servo_id);
+        static double  ReadGoalCurrent(uint8_t servo_id);
+        static double  ReadGoalVelocity(uint8_t servo_id);
+        static double  ReadGoalPosition(uint8_t servo_id);
+        static double  ReadProfileAcc(uint8_t servo_id);
+        static double  ReadProfileVel(uint8_t servo_id);
+        static double  ReadHomingOffset(uint8_t servo_id);
         static uint8_t ReadOperatingMode(uint8_t servo_id);
+        static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
         static bool WriteGoalPWM(uint8_t servo_id, double pwm);
         static bool WriteGoalCurrent(uint8_t servo_id, double current);
         static bool WriteGoalVelocity(uint8_t servo_id, double velocity);
+        static bool WriteGoalPosition(uint8_t servo_id, double position);
         static bool WriteProfileAcc(uint8_t servo_id, double acceleration);
         static bool WriteProfileVel(uint8_t servo_id, double velocity);
-        static bool WriteGoalPosition(uint8_t servo_id, double position);
         static bool WriteHomingOffset(uint8_t servo_id, double offset);
-        static bool WriteTorqueEnable(uint8_t servo_id, bool enable);
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
         static bool WriteBusWatchdog(uint8_t servo_id, double time);
     
@@ -200,8 +206,8 @@ class DynamixelHandler {
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ
         static inline bool has_hardware_err_ = false; // 連結しているDynamixelのうち，どれか一つでもハードウェアエラーを起こしているかどうか
         // 各周期で実行するserial通信の内容を決めるためのset
-        static inline set<CmdValueIndex> list_write_cmd_  = {};
-        static inline set<StValueIndex>  list_read_state_ = {PRESENT_CURRENT, PRESENT_VELOCITY, PRESENT_POSITION};
+        static inline set<CmdValueIndex> list_write_cmd_ ;
+        static inline set<StValueIndex>  list_read_state_;
         //* 連結しているDynamixelに一括で読み書きする関数
         static void SyncWriteCommandValues(set<CmdValueIndex>& list_wirte_cmd=list_write_cmd_);
         static void SyncWriteOption_Mode();  // todo 

@@ -80,7 +80,7 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
         ROS_ERROR("Dynamixel is not found in USB device [%s]", dyn_comm_.port_name().c_str());
         return false;
     }
-    if( num_expexted>0 && num_expexted!=num_found ) { // 期待数が設定されているときに、見つかった数が期待数と異なる場合は初期化失敗で終了
+    if( num_expexted>0 && num_expexted>num_found ) { // 期待数が設定されているときに、見つかった数が期待数と異なる場合は初期化失敗で終了
         ROS_ERROR("Number of Dynamixel is not matched. Expected [%d], but found [%d]", num_expexted, num_found);
         return false;
     }
@@ -105,13 +105,13 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
 
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
-        op_mode_[id] = dyn_comm_.tryRead(operating_mode, id);
-        cmd_values_[id][GOAL_PWM]      = goal_pwm.pulse2val            (dyn_comm_.tryRead(goal_pwm            , id), model_[id]);
-        cmd_values_[id][GOAL_CURRENT]  = goal_current.pulse2val        (dyn_comm_.tryRead(goal_current        , id), model_[id]);
-        cmd_values_[id][GOAL_VELOCITY] = goal_velocity.pulse2val       (dyn_comm_.tryRead(goal_velocity       , id), model_[id]);
-        cmd_values_[id][PROFILE_ACC]   = profile_acceleration.pulse2val(dyn_comm_.tryRead(profile_acceleration, id), model_[id]);
-        cmd_values_[id][PROFILE_VEL]   = profile_velocity.pulse2val    (dyn_comm_.tryRead(profile_velocity    , id), model_[id]);
-        cmd_values_[id][GOAL_POSITION] = goal_position.pulse2val       (dyn_comm_.tryRead(goal_position       , id), model_[id]);
+        op_mode_[id] = ReadOperatingMode(id);
+        cmd_values_[id][GOAL_PWM]      = ReadGoalPWM(id);
+        cmd_values_[id][GOAL_CURRENT]  = ReadGoalCurrent(id);
+        cmd_values_[id][GOAL_VELOCITY] = ReadGoalVelocity(id);
+        cmd_values_[id][PROFILE_ACC]   = ReadProfileAcc(id);
+        cmd_values_[id][PROFILE_VEL]   = ReadProfileVel(id);
+        cmd_values_[id][GOAL_POSITION] = ReadGoalPosition(id);
     }
 
     // 状態のreadの後にやるべき初期化
@@ -134,7 +134,6 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     if (!nh_p.getParam("read/position_trajectory",  read_pos_traj)) read_pos_traj = false;
     if (!nh_p.getParam("read/present_input_voltage",read_volt))     read_volt = false;
     if (!nh_p.getParam("read/present_temperature",  read_temp))     read_temp = false;
-    list_read_state_.clear();
     if ( read_pwm ) list_read_state_.insert(PRESENT_PWM);
     if ( read_cur ) list_read_state_.insert(PRESENT_CURRENT);
     if ( read_vel ) list_read_state_.insert(PRESENT_VELOCITY);

@@ -17,9 +17,9 @@ void DynamixelHandler::CallBackDxlCommand(const dynamixel_handler::DynamixelComm
     if (msg.command == "torque_off"  || msg.command == "TOFF")
         for (auto id : id_list) TorqueOff(id);
     if (msg.command == "enable") 
-        for (auto id : id_list) WriteTorqueEnable(id, TORQUE_ENABLE);
+        for (auto id : id_list) WriteTorqueEnable(id, true);
     if (msg.command == "disable")
-        for (auto id : id_list) WriteTorqueEnable(id, TORQUE_DISABLE);
+        for (auto id : id_list) WriteTorqueEnable(id, false);
     if (msg.command == "reboot") 
         for (auto id : id_list) dyn_comm_.Reboot(id);
 }
