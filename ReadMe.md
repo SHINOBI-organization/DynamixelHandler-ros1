@@ -63,8 +63,9 @@ baudrateを変更したい場合は次のlaunchファイルからdynamixel_unify
 
 dynamixel_unify_baudrate.launchの以下の部分を編集し，保存
 ``` xml
+<!-- dynamixel_unify_baudrate.launch -->
 <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
-<arg name="TARGET_BAUDRATE" default="2000000"/>
+<arg name="TARGET_BAUDRATE" default="1000000"/>
 ```
 ターミナルを開いて次を実行
 ```
@@ -80,6 +81,7 @@ dynamixel_handler.launchのargにbaudrateとdevice_nameを設定し，roslaunch�
 
 dynamixel_handler.launchの以下の部分を編集し，保存
 ```xml
+<!-- dynamixel_handler.launch -->
 <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
 <arg name="BAUDRATE" default="1000000"/>
 ```
@@ -108,33 +110,38 @@ ID:5のDynamixelが位置制御モードでなかった場合は自動で変換�
 
 制御指令はカスタム msg として次のように定義している．
 
-位置制御用, `/dynamixel/cmd/x/position`に対応
-```
+位置制御, `/dynamixel/cmd/x/position`に対応
+```yml
+# DynamixelCommnad_X_ControlPosition.msg
 uint16[] id_list
 float64[] position__deg
 ```
 
-速度制御用, `/dynamixel/cmd/x/velocity`に対応
-```
+速度制御, `/dynamixel/cmd/x/velocity`に対応
+```yml
+# DynamixelCommnad_X_ControlVelocity.msg
 uint16[] id_list
 float64[] velocity__deg_s
 ```
 
-電流制御用，`/dynamixel/cmd/x/current`に対応
-```
+電流制御, `/dynamixel/cmd/x/current`に対応
+```yml
+# DynamixelCommnad_X_ControlCurrent.msg
 uint16[] id_list
 float64[] current__mA
 ```
 
 拡張位置制御用，`/dynamixel/cmd/x/extended_position`に対応
-```
+```yml
+# DynamixelCommnad_X_ControlExtendedPosition.msg
 uint16[] id_list
 float64[] position__deg
 float64[] rotation # optional, 256までの回転数を指定できる
 ```
 
 電流制限付き位置制御用，`/dynamixel/cmd/x/current_position`に対応
-```
+```yml
+# DynamixelCommnad_X_ControlCurrentPosition.msg
 uint16[] id_list
 float64[] current__mA
 float64[] position__deg
@@ -200,16 +207,23 @@ ros param `use/split_read` によって変更できる．
 
 サーボへの入力を行うためのtopic.
 
- - /dynamixel/command
- - /dynamixel/cmd/x/current
- - /dynamixel/cmd/x/velocity
- - /dynamixel/cmd/x/position
- - /dynamixel/cmd/x/extended_position
- - /dynamixel/cmd/x/current_position 
- - /dynamixel/cmd/profile
- - /dynamixel/option/gain/w : 未実装
- - /dynamixel/option/limit/w : 未実装
- - /dynamixel/option/mode/w : 未実装
+ - `/dynamixel/command` (`DynamixelCommand` type) :   
+ dynamixelの起動や停止，エラー解除コマンドなどを送るためのtopic 
+ - `/dynamixel/cmd/x/current` (`DynamixelCommand_X_ControlCurrent` type) :   
+ 電流制御モードで動かすためのtopic
+ - `/dynamixel/cmd/x/velocity` (`DynamixelCommand_X_ControlVelocity` type) :   
+ 速度制御モードで動かすためのtopic
+ - `/dynamixel/cmd/x/position` (`DynamixelCommand_X_ControlPosition` type) :   
+ 位置制御モードで動かすためのtopic
+ - `/dynamixel/cmd/x/extended_position` (`DynamixelCommand_X_ControlExtendedPosition` type) :   
+ 拡張位置制御モードで動かすためのtopic
+ - `/dynamixel/cmd/x/current_position ` (`DynamixelCommand_X_ControlCurrentPosition` type) :   
+ 電流制限付き位置制御モードで動かすためのtopic
+ - `/dynamixel/cmd/profile` (`DynamixelCommand_Profile` type) :   
+ profile_accelerationとprofile_velocityを設定するためのtopic
+ - `/dynamixel/option/gain/w` (`DynamixelOption_Gain` type) : 未実装
+ - `/dynamixel/option/limit/w` (`DynamixelOption_Limit` type) : 未実装
+ - `/dynamixel/option/mode/w` (`DynamixelOption_Mode` type)  : 未実装
  
 #### Published from dyanmixel_handler　
 
@@ -218,7 +232,7 @@ ros param `use/split_read` によって変更できる．
  - /dynamixel/state
  - /dynamixel/error
  - /dynamixel/option/gain/r : 未実装
- - /dynamixel/option/limit/r : 未実装
+ - /dynamixel/option/limit/r
  - /dynamixel/option/mode/r : 未実装
 
 ***************************
@@ -286,7 +300,8 @@ ros param `use/split_read` によって変更できる．
 
 ros paramの変更には，dynamixel_handler.launchの以下の部分を編集して保存する．
 ```xml
-<arg name="LATENCY_TIMER" default="2"/>
+<!-- dynamixel_handler.launch -->
+<arg name="LATENCY_TIMER" default="4"/>
 ```
 
 使用するUSBデバイスのlatency timerは次のようにして変更する．
@@ -361,7 +376,7 @@ note: 制御モードによってデフォルト値が異なり，なんとモ�
                             未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
  - drive_mode             : 未実装，現在値を`/dynamixel/option/mode/r`としてpubできるにようにする．    
                             未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
- - torque_enable          : 接続時に自動でトルクONされる. `/dynamixel/cmd_free`の`command='eneble'`でON,`command='disable'`でOFFに設定される．  
+ - torque_enable          : 接続時に自動でトルクONされる. `/dynamixel/commnad`の`command`=`'torque_on'` or `'enable'`で1,`command`=`'torque_off'` or `'disable'`で0に設定される．  
                             未実装，現在値を`/dynamixel/option/gain/r`としてpubされるようにする．   
                             未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
 

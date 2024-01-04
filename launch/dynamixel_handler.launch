@@ -15,8 +15,8 @@
     <!-- <env name="ROSCONSOLE_FORMAT" value="${function}: ${message}"/> -->
     
     <arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
-    <arg name="BAUDRATE" default="2000000"/>
-    <arg name="LATENCY_TIMER" default="2"/>
+    <arg name="BAUDRATE" default="57600"/>
+    <arg name="LATENCY_TIMER" default="16"/>
 
     <node pkg="dynamixel_handler" name="dxl_handler" type="dynamixel_handler_node" output="screen">
         <!-- トピックの設定 -->
@@ -28,16 +28,16 @@
         <remap from="/dynamixel/cmd/x/current"           to="/dynamixel/cmd/x/current"/>
         <remap from="/dynamixel/cmd/x/current_position"  to="/dynamixel/cmd/x/current_position"/>
         <remap from="/dynamixel/cmd/x/extended_position" to="/dynamixel/cmd/x/extended_position"/>
-        <remap from="/dynamixel/option/limit/w" to="/dynamixel/option/limit/w"/>
-        <remap from="/dynamixel/option/gain/w"  to="/dynamixel/option/gain/w" />
-        <remap from="/dynamixel/option/mode/w"  to="/dynamixel/option/mode/w" />
+        <remap from="/dynamixel/opt/limit/w" to="/dynamixel/opt/limit/w"/>
+        <remap from="/dynamixel/opt/gain/w"  to="/dynamixel/opt/gain/w" />
+        <remap from="/dynamixel/opt/mode/w"  to="/dynamixel/opt/mode/w" />
 
         <!-- 読み込み -->
         <remap from="/dynamixel/state" to="/dynamixel/state"/>
         <remap from="/dynamixel/error" to="/dynamixel/error"/>
-        <remap from="/dynamixel/option/limit/r" to="/dynamixel/option/limit/r"/>
-        <remap from="/dynamixel/option/gain/r"  to="/dynamixel/option/gain/r" />
-        <remap from="/dynamixel/option/mode/r"  to="/dynamixel/option/mode/r" />
+        <remap from="/dynamixel/opt/limit/r" to="/dynamixel/opt/limit/r"/>
+        <remap from="/dynamixel/opt/gain/r"  to="/dynamixel/opt/gain/r" />
+        <remap from="/dynamixel/opt/mode/r"  to="/dynamixel/opt/mode/r" />
 
         <!-- 通信の設定 -->
         <param name="device_name"   value="$(arg DEVICE_NAME)"/>
@@ -48,18 +48,18 @@
         <param name="dyn_comm/varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
 
         <!-- サーボの初期設定 -->
-        <param name="init/auto_search_max_id"        value="45"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
+        <param name="init/auto_search_max_id"        value="10"/>   <!-- 初期化時に自動検出するサーボの最大ID，多すぎると検索に時間かかる -->
         <param name="init/expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
         <param name="init/hardware_error_auto_clean" value="true"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
         <param name="init/torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
         <param name="term/torque_auto_disable"       value="true"/>  <!-- 終了時に Torque を自動でOFFにするかどうか -->
 
         <!-- ループの設定 -->
-        <param name="loop_rate" value="400"/>
+        <param name="loop_rate" value="100"/>
         <param name="ratio/state_read"   value="2"/>    <!-- この回数に一回 State を読み取る, 0=初回のみ -->
-        <param name="ratio/option_read"  value="500"/>    <!-- この回数に一回 option を読み取る, 0=初回のみ -->
-        <param name="ratio/error_read"   value="100"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
-        <param name="ratio/varbose_loop" value="200"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
+        <param name="ratio/option_read"  value="1000"/>    <!-- この回数に一回 option を読み取る, 0=初回のみ -->
+        <param name="ratio/error_read"   value="200"/>  <!-- この回数に一回 Hardware error を読み取る, 0=初回のみ -->
+        <param name="ratio/varbose_loop" value="100"/>   <!-- メインループの処理時間，通信の成功率を出力, ex 100なら100回に1回出力 -->
         
         <!-- Read/Write方式 -->
         <param name="use/fast_read"  value="true"/>  <!-- Fast Sync Readを使用するかどうか． falseにすると遅い -->
@@ -77,9 +77,9 @@
         <param name="read/present_temperature"   value="false"/>
         
         <!-- デバック用 -->
-        <param name="max_log_width"        value="8"/>     <!-- 以下のlog出力で，サーボ何個ごとに改行を入れるか -->
+        <param name="max_log_width"        value="6"/>     <!-- 以下のlog出力で，サーボ何個ごとに改行を入れるか -->
         <param name="varbose/callback"     value="false"/> <!-- コールバック関数の呼び出しを出力 -->
-        <param name="varbose/write_commad"    value="false"/> <!-- 書き込みするcommandデータのpulse値を出力 -->
+        <param name="varbose/write_commad"    value="true"/> <!-- 書き込みするcommandデータのpulse値を出力 -->
         <param name="varbose/write_option"    value="false"/> <!-- 書き込みするoptionデータのpulse値を出力 -->
         <param name="varbose/read_state/raw"  value="false"/> <!-- 読み込んだstateデータのpulse値を出力 -->
         <param name="varbose/read_state/err"  value="false"/>  <!-- stateデータの読み込みエラーを出力 -->
