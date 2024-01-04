@@ -25,55 +25,20 @@ note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど�
    - 複数のアドレスを一括で読み書き & 複数のサーボを同時に読み書き(SyncRead/SyncWrite) によって Serial通信の回数を抑える
    - Fast Sync Read インストラクションを活用して Read を高速化
    - Raed/Write は ROS node の周期と同期しているので，topicのcallbackに左右されない．
-   - ※ 適切な`LATENCY_TIMER`の設定が必要(2 ~ 4msくらい)
- - node を起動するだけで連結したDynamixelを自動で認識
- - node を kill したタイミングで動作を停止
- - 初期化時にエラーを自動でクリア
- - エラークリア時の回転数消失問題を homing offset により自動補正
+   - ※ 適切な`LATENCY_TIMER`(2 ~ 4msくらい)と`baudrate`(1000000 ~ 推奨)の設定が必要
+ - 開発における面倒を減らす機能
+    - 初期化時に連結したDynamixelを自動で認識
+    - 初期化時にエラーを自動でクリア (Optional)
+    - 初期化時にトルクを自動でON (Optional)
+    - node を kill したタイミングで動作を停止 
+    - node を kill したタイミングでトルクをOFF (Optional)
+    - エラークリア時の回転数消失問題を homing offset により自動補正
+    - baudrateを一括で変更可能 (別nodeとして独立) 
  - ros param から各種 log 表示の制御が可能
    - Read/Write にかかる平均時間とSerial通信の成功率
    - Read/Write されるパルス値
    - Readに失敗したID
    - etc...
-
-***************************
-
-### 未実装機能
- - 精度に合わせてpubする値を丸める
- - profile_velocity_とprofile_acceleration
-   - 書き込みは実装できているので，command topic から設定できるようにする
-   - 電源喪失・モードチェンジ・Rebootで初期化されていしまう問題への対処
- - limit系
-   - paramからの設定ができるようにする
-   - pubできるようにする
-   - （subによる動的な設定はできなくていいか？）
- - gain系
-   - paramから設定できるようにする
-   - pubできるようにする
-   - 電源喪失・Rebootで初期化されていしまう問題の対処
-   - モード変更によってモードごとのデフォルト値に初期化される問題の対処
-     - FW ver 45 以上で使えるresotre_configurationだと，バックアップ作成時点の値になってしまい，意図と異なる場合が発生しかねない． 
- - mode系
-   - paramから設定できるようにする
-   - pubできるようにする
- - commnad topic を service にする
- - baudrate を統一し一括変更できる sub node を作成する
- - 電流/速度制御時に通信が途切れたら自動で停止するようにする
- - External Portsをうまいことやる
- - free command topic が対応しているコマンドを増やす
-   - 特にユーザ定義のアドレスをreadするようなコマンドを追加したい
- - free state topic として，ユーザー定義のアドレスの値を監視できるようにする
- - command の設定値を callback でストアしてからメインループで write しているので，最大 1/roop_late [sec] の遅延が生じうる．
-   - 現在の方法：sub callback でストアしメインループで write
-     - [＋] write回数が抑えられる．
-       - 各IDへの command が別の topic に乗ってきても，node 側で 1/roop_late [sec] 分の command をまとめてくれる
-     - [＋] write の周期が一定以下になり，read の圧迫や負荷の変動が起きづらい
-     - [－] 一度 command をストアするので，topic の sub から 最大 1/roop_late [sec] の遅延が生じてしまう．
-       - 8ms未満くらいは遅れるが，そもそものtopicの遅延の方が支配的?(topic遅延が6ms，callback->writeが遅延2ms)
-   - もう一つの方法：sub callback で直接 write
-     - [＋] callback後の遅延は生じない
-     - [－] topic の pub の仕方によってはwrite回数が増えてしまう
-       - 例えば，ID:5へ指令する command topic と ID:6が別のノードからpubされているとすると，callbackは2回呼ばれる．一度ストアしてからまとめてWrite方式だとwriteは1回だが，callbackで直接Write方式だとwriteも2回
 
 ***************************
 
@@ -92,27 +57,25 @@ $ git submodule update
 ## how to use
 
 ### 1. Dynamixelを接続
-   DynaimixelをディジーチェーンにしてUSBで接続する．
+DynaimixelをディジーチェーンにしてUSBで接続する．
+idに重複がないように事前にDynamixel Wizardなどを用いて設定すること.
+baudrateを変更したい場合は次のlaunchファイルからdynamixel_unify_baudrate nodeを実行する.
 
-   note: baudrateがすべて同一かつ，idに重複がないように事前に設定すること
-   
-### 2. dynamixel_handlerの起動
+dynamixel_unify_baudrate.launchの以下の部分を編集し，保存
+``` xml
+<arg name="DEVICE_NAME" default="/dev/ttyUSB0"/>
+<arg name="TARGET_BAUDRATE" default="2000000"/>
+```
+ターミナルを開いて次を実行
+```
+roslaunch dynamixel_handler dynamixel_unify_baudrate.launch
+```
+全てのdynamixelのbaudrateを`TARGET_BAUDRATE`に設定してくれる．変更が終わると自動でnodeは終了する．
+
+### 2. dynamixel_handler nodeの起動
 
 baudrate: 1000000 かつ device name: /dec/ttyUSB0の場合
 
-#### rosrun からの起動
-argを指定してroscore, rosrunで実行
-
-ターミナルを開いて以下を実行
-```
-$ roscore
-```
-別のターミナルを開いて以下を実行
-```
-$ rosrun dynamixel_handler dynamixel_handler_node _BAUDRATE:=1000000 DEVICE:=/dev/ttyUSB0
-```
-
-#### roslaunch からの起動
 dynamixel_handler.launchのargにbaudrateとdevice_nameを設定し，roslaunchで起動する
 
 dynamixel_handler.launchの以下の部分を編集し，保存
@@ -124,11 +87,15 @@ dynamixel_handler.launchの以下の部分を編集し，保存
 ```
 $ roslaunch dynamixel_handler dynamixel_handler.launch
 ```
+連結したDynamixelを探索し，見つかったDynamixelの初期設定を行う．
+通信状態によっては連結しているのに見つからない場合もあるので，その場合はros paramの `dyn_comm/retry_num` を大きくする．
+`init/expected_servo_num`に0以上が設定されている場合，その個数のDynamixelが見つからないと初期化失敗で自動でnodeが終了する．
 
-### 3. 状態を制御
+### 3. Dynamixelを制御
 
 ID:5のDynamixel Xシリーズ のサーボを位置制御モード(position control mode)で角度を90degにしたい場合．
-以下のように，`/dynamixel/cmd/x/position` topicを送ればよい．
+
+以下のように，`/dynamixel/cmd/x/position` topicにIDと角度を設定してpublishすればよい．
 
 ```
 $ rostopic pub /dynamixel/cmd/x/position \
@@ -175,37 +142,53 @@ float64[] rotation # optional, 256までの回転数を指定できる
 ```
 note: topic監視によるデバックの容易性の観点から角度はすべてdegにしてある
 
-### 4.状態の確認
+### 4. Dynamixelの情報を取得
 
 ID:5とID:6のモータが接続している場合
+
+`/dyanmixel/state` topic として一定周期で raed & pubされ続けている．
+周期はros paramが `loop_rate=100` かつ `ratio/state_read=2`の時 100/2 = 50Hzとなる．
 
 ```
 $ rostopic echo /dyanmixel/state
 ```
 
 出力例
-```
-~~~
+```yml
 ---
 stamp: 
   secs: 1703962959
   nsecs: 388530440
-id_list: [5, 6] // 認識されているサーボのID
-current__mA: [0.0, -2.69] // 現在の電流値
-velocity__deg_s: [0.0, 0.0] // 現在の各速度
-position__deg: [89.91210937499999, -0.2636718750000023] // 現在の角度
-vel_trajectory__deg_s: [] // 目標速度 みたいなもの
-pos_trajectory__deg: [] // 目標角度 みたいなもの
-temperature__degC: [] // 現在の温度
-input_voltage__V: [] // 現在の入力電圧
+id_list: [5, 6] # 認識されているサーボのID
+current__mA: [0.0, -2.69] # 現在の電流値
+velocity__deg_s: [0.0, 0.0] # 現在の各速度
+position__deg: [89.91210937499999, -0.2636718750000023] # 現在の角度
+vel_trajectory__deg_s: [] # 目標速度 みたいなもの
+pos_trajectory__deg: [] # 目標角度 みたいなもの
+temperature__degC: [] # 現在の温度
+input_voltage__V: [] # 現在の入力電圧
 ---
-stamp:
-  secs: 1703962959
-  nsecs: 396484578
-~~~
 ```
 どの情報をpubするかは ros param から設定可能．
-paramの章を参照
+
+dynamixelからのread方式は Sync Read であり，すべてのIDから一斉にreadするようになっている．
+ただし，ros param `use/fast_read=true` の場合は  Fast Sync Read が用いられる．
+
+また，上記の出力例にあるように複数の情報を読み込んでいるが，複数情報を一括でreadするか，分割でreadするかは，
+ros param `use/split_read` によって変更できる．
+分割でreadする場合は，読み込む情報の数分だけreadに時間がかかるので注意．
+
+***************************
+
+## sample code
+
+### cpp
+```
+```
+
+### python
+```
+```
 
 ***************************
 
@@ -217,13 +200,13 @@ paramの章を参照
 
 サーボへの入力を行うためのtopic.
 
- - /dynamixel/cmd_free
+ - /dynamixel/command
  - /dynamixel/cmd/x/current
  - /dynamixel/cmd/x/velocity
  - /dynamixel/cmd/x/position
  - /dynamixel/cmd/x/extended_position
  - /dynamixel/cmd/x/current_position 
- - /dynamixel/cmd/profile : 未実装
+ - /dynamixel/cmd/profile
  - /dynamixel/option/gain/w : 未実装
  - /dynamixel/option/limit/w : 未実装
  - /dynamixel/option/mode/w : 未実装
@@ -232,8 +215,6 @@ paramの章を参照
 
 サーボからの出力を監視するためのtopic.
 
-
- - /dynamixel/state_free : 未実装
  - /dynamixel/state
  - /dynamixel/error
  - /dynamixel/option/gain/r : 未実装
@@ -248,6 +229,7 @@ paramの章を参照
 <!-- 通信の設定 -->
 <param name="device_name" value="$(arg DEVICE_NAME)"/>
 <param name="baudrate" value="$(arg BAUDRATE)"/>
+<param name="latency_timer" value="$(arg LATENCY_TIMER)"/>
 <param name="dyn_comm/retry_num"      value="3"/> <!-- 単体通信失敗時のリトライ回数，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
 <param name="dyn_comm/inerval_msec"   value="5"/> <!-- 単体通信失敗時のインターバル時間，初期化にかかる時間は延びるが，メインのsub/pub周期には影響なし -->
 <param name="dyn_comm/varbose"        value="false"/> <!-- 通信失敗時の詳細をエラーとして出すか -->
@@ -257,6 +239,8 @@ paramの章を参照
 <param name="init/expected_servo_num"        value="0"/>    <!-- 初期化時に検出されたサーボがこの個数以外なら初期化失敗で止まる，0ならいくつでもok -->
 <param name="init/hardware_error_auto_clean" value="false"/> <!-- 初期化時に Hardware error を自動でクリアするかどうか -->
 <param name="init/torque_auto_enable"        value="true"/>  <!-- 初期化時に Torque を自動でONにするかどうか -->
+<param name="term/torque_auto_disable"       value="true"/>  <!-- 終了時に Torque を自動でOFFにするかどうか -->
+
 
 <!-- ループの設定 -->
 <param name="loop_rate" value="250"/>
@@ -296,12 +280,17 @@ paramの章を参照
 
 ## 初期設定と注意事項
 
-`include\mylib_dynamixel\download\port_handler_linux.cpp` 内の `LATENCY_TIMER` と使用するUBSデバイスのlatency timerを一致させる必要がある．
-このライブラリのデフォルトは`LATENCY_TIMER=16`で，USBデバイス側のデフォルトと等しいので通常は問題にならないが，高速化したいとき問題となる．
+シリアル通信にはパケットの送受信の間にlatency timer分のインターバルが挟まる．
+(デフォルトは16msのようであり，高速な通信の妨げとなることが多い)
+安定した通信のためには，使用するUBSデバイスの latency timer とros paramの `LATENCY_TIMER` を一致させる必要がある．
 
-`include\download\port_handler_linux.cpp` 内の `LATENCY_TIMER`は，該当部分を書き換えてコンパイルでOK
+ros paramの変更には，dynamixel_handler.launchの以下の部分を編集して保存する．
+```xml
+<arg name="LATENCY_TIMER" default="2"/>
+```
 
 使用するUSBデバイスのlatency timerは次のようにして変更する．
+ttyUSB0 の部分は自分の環境に合わせて編集すること．
 ```
 $ echo ACTION==\"add\", SUBSYSTEM==\"usb-serial\", DRIVER==\"ftdi_sio\", ATTR{latency_timer}=\"4\" > 99-dynamixelsdk-usb.rules
 $ sudo cp ./99-dynamixelsdk-usb.rules /etc/udev/rules.d/
@@ -316,46 +305,29 @@ $ echo 4 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 $ cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
 ```
 
-コピペ用
-
-```
-echo ACTION==\"add\", SUBSYSTEM==\"usb-serial\", DRIVER==\"ftdi_sio\", ATTR{latency_timer}=\"4\" > 99-dynamixelsdk-usb.rules
-sudo cp ./99-dynamixelsdk-usb.rules /etc/udev/rules.d/
-sudo udevadm control --reload-rules
-sudo udevadm trigger --action=add
-cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
-```
-
-```
-echo 4 | sudo tee /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
-cat /sys/bus/usb-serial/devices/ttyUSB0/latency_timer
-```
-
 ***************************
 
 ## Control Table との対応
 
 ### コマンド (goal values)
- - goal_pwm    : 未実装，`/dynamixel/cmd/x/pwm`をsubすると設定されるようにしたい
- - goal_current    : `/dynamixel/cmd/x/current` or `/dynamixel/cmd/x/current_position`をsubすると設定され，loop_rateの周期で書き込まれる．
- - goal_velocity       : `/dynamixel/cmd/x/velocity`をsubすると設定され，loop_rateの周期で書き込まれる．
- - goal_position         : `/dynamixel/cmd/x/position` or `/dynamixel/cmd/x/current_position` or `/dynamixel/cmd/x/extended_position` をsubすると設定され．loop_rateの周期で書き込まれる．
+ - goal_pwm             : 未実装，`/dynamixel/cmd/x/pwm`をsubすると設定されるようにしたい
+ - goal_current         : `/dynamixel/cmd/x/current` or `/dynamixel/cmd/x/current_position`をsubすると設定され，`loop_rate`の周期で書き込まれる．
+ - goal_velocity        : `/dynamixel/cmd/x/velocity`をsubすると設定され，`loop_rate`の周期で書き込まれる．
+ - goal_position        : `/dynamixel/cmd/x/position` or `/dynamixel/cmd/x/current_position` or `/dynamixel/cmd/x/extended_position` をsubすると設定され．`loop_rate`の周期で書き込まれる．
+ - profile_acceleration : `/dynamixel/cmd/profile`をsubすると設定される．`loop_rate`の周期で書き込まれる．
+ - profile_velocity     : `/dynamixel/cmd/profile`をsubすると設定される．`loop_rate`の周期で書き込まれる．
+
+note: profile_{~}は制御モードが変わると勝手に0に変更されてしまう．対策済み．
 
 ### 状態 (present values)
- - present_pwm : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
- - present_current : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - present_velocity    : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - present_position      : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - velocity_trajectory : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - position_trajectory   : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる．
- - present_input_voltage : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
- - present_temperture : `/dynamixel/state`として, loop_rate/ratio_read_stateの周期でpubされる
-  
-### Profile 
- - profile_acceleration : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
- - profile_velocity    : 未実装，`/dynamixel/cmd/profile`をsubすると設定されるようにしたい．
-
-note: 制御モードが変わると勝手に0に変更されてしまう．対策済み．
+ - present_pwm : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる
+ - present_current : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる．
+ - present_velocity    : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる．
+ - present_position      : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる．
+ - velocity_trajectory : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる．
+ - position_trajectory   : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる．
+ - present_input_voltage : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる
+ - present_temperture : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる 
 
 ### 制限 
  - temperature_limit  : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
@@ -394,7 +366,7 @@ note: 制御モードによってデフォルト値が異なり，なんとモ�
                             未実装，`/dynamixel/option/mode/w`をsubして設定されるようにする．
 
 ### エラー
- - hardware_error_status  : `/dynamixel/error`としてloop_rate/ratio_read_errorの周期でpubされる. 
+ - hardware_error_status  : `/dynamixel/error`として`loop_rate`のうち，`ratio/read_error`に一回の周期でpubされる. 
 
 ### 設定
  - return_delay_time      : not support
@@ -414,6 +386,38 @@ note: (bus_watchdog の設定値が1以上の時) bus_watchdogの設定値 × 20
  - realtime_tick          : not support
  - moving                 : not support
  - moving_status          : not support
+
+***************************
+
+### 未実装機能
+ - 精度に合わせてpubする値を丸める
+ - limit系
+   - paramからの設定ができるようにする
+   - pubできるようにする
+   - （subによる動的な設定はできなくていいか？）
+ - gain系
+   - paramから設定できるようにする
+   - pubできるようにする
+   - 電源喪失・Rebootで初期化されていしまう問題の対処
+   - モード変更によってモードごとのデフォルト値に初期化される問題の対処
+     - FW ver 45 以上で使えるresotre_configurationだと，バックアップ作成時点の値になってしまい，意図と異なる場合が発生しかねない． 
+ - mode系
+   - paramから設定できるようにする
+   - pubできるようにする
+ - commnad topic を service にする
+ - 電流/速度制御時に通信が途切れたら自動で停止するようにする
+ - External Portsをうまいことやる
+ - command の設定値を callback でストアしてからメインループで write しているので，最大 1/roop_late [sec] の遅延が生じうる．
+   - 現在の方法：sub callback でストアしメインループで write
+     - [＋] write回数が抑えられる．
+       - 各IDへの command が別の topic に乗ってきても，node 側で 1/roop_late [sec] 分の command をまとめてくれる
+     - [＋] write の周期が一定以下になり，read の圧迫や負荷の変動が起きづらい
+     - [－] 一度 command をストアするので，topic の sub から 最大 1/roop_late [sec] の遅延が生じてしまう．
+       - 8ms未満くらいは遅れるが，そもそものtopicの遅延の方が支配的?(topic遅延が6ms，callback->writeが遅延2ms)
+   - もう一つの方法：sub callback で直接 write
+     - [＋] callback後の遅延は生じない
+     - [－] topic の pub の仕方によってはwrite回数が増えてしまう
+       - 例えば，ID:5へ指令する command topic と ID:6が別のノードからpubされているとすると，callbackは2回呼ばれる．一度ストアしてからまとめてWrite方式だとwriteは1回だが，callbackで直接Write方式だとwriteも2回
 
 ***************************
 
