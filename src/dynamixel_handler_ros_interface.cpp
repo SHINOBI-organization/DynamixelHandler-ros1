@@ -259,8 +259,23 @@ void DynamixelHandler::BroadcastDxlError(){
 }
 
 void DynamixelHandler::BroadcastDxlOption_Limit(){
-
+    dynamixel_handler::DynamixelOption_Limit msg;
+    msg.stamp = ros::Time::now();
+    for (const auto& [id, limit] : option_limit_) {
+        msg.id_list.push_back(id);
+        msg.temperature_limit__degC.push_back   (round4(limit[TEMPERATURE_LIMIT ]));
+        msg.max_voltage_limit__V.push_back      (round4(limit[MAX_VOLTAGE_LIMIT ]));
+        msg.min_voltage_limit__V.push_back      (round4(limit[MIN_VOLTAGE_LIMIT ]));
+        msg.pwm_limit__percent.push_back        (round4(limit[PWM_LIMIT         ]));
+        msg.current_limit__mA.push_back         (round4(limit[CURRENT_LIMIT     ]));
+        msg.acceleration_limit__deg_ss.push_back(round4(limit[ACCELERATION_LIMIT]/DEG));
+        msg.velocity_limit__deg_s.push_back     (round4(limit[VELOCITY_LIMIT    ]/DEG));
+        msg.max_position_limit__deg.push_back   (round4(limit[MAX_POSITION_LIMIT]/DEG));
+        msg.min_position_limit__deg.push_back   (round4(limit[MIN_POSITION_LIMIT]/DEG));
+    }
+    pub_opt_limit_.publish(msg);
 }
+
 void DynamixelHandler::BroadcastDxlOption_Gain(){
 
 }
