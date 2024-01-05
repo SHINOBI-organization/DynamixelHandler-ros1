@@ -223,20 +223,22 @@ void DynamixelHandler::CallBackDxlOption_Mode(const dynamixel_handler::Dynamixel
  
 }
 
+double round4(double val) { return round(val*10000.0)/10000.0; }
+
 void DynamixelHandler::BroadcastDxlState(){
     dynamixel_handler::DynamixelState msg;
     msg.stamp = ros::Time::now();
-    for (auto id : id_list_) {
+    for (const auto& [id, value] : state_values_) {
         msg.id_list.push_back(id);
         for (auto state : list_read_state_) switch(state) {
-            case PRESENT_PWM:          msg.pwm__percent.push_back         (state_values_[id][PRESENT_PWM          ]    ); break;
-            case PRESENT_CURRENT:      msg.current__mA.push_back          (state_values_[id][PRESENT_CURRENT      ]    ); break;
-            case PRESENT_VELOCITY:     msg.velocity__deg_s.push_back      (state_values_[id][PRESENT_VELOCITY     ]/DEG); break;
-            case PRESENT_POSITION:     msg.position__deg.push_back        (state_values_[id][PRESENT_POSITION     ]/DEG); break;
-            case VELOCITY_TRAJECTORY:  msg.vel_trajectory__deg_s.push_back(state_values_[id][VELOCITY_TRAJECTORY  ]/DEG); break;
-            case POSITION_TRAJECTORY:  msg.pos_trajectory__deg.push_back  (state_values_[id][POSITION_TRAJECTORY  ]/DEG); break;
-            case PRESENT_TEMPERTURE:   msg.temperature__degC.push_back    (state_values_[id][PRESENT_TEMPERTURE   ]    ); break;
-            case PRESENT_INPUT_VOLTAGE:msg.input_voltage__V.push_back     (state_values_[id][PRESENT_INPUT_VOLTAGE]    ); break;
+            case PRESENT_PWM:          msg.pwm__percent.push_back         (round4(value[state]    )); break;
+            case PRESENT_CURRENT:      msg.current__mA.push_back          (round4(value[state]    )); break;
+            case PRESENT_VELOCITY:     msg.velocity__deg_s.push_back      (round4(value[state]/DEG)); break;
+            case PRESENT_POSITION:     msg.position__deg.push_back        (round4(value[state]/DEG)); break;
+            case VELOCITY_TRAJECTORY:  msg.vel_trajectory__deg_s.push_back(round4(value[state]/DEG)); break;
+            case POSITION_TRAJECTORY:  msg.pos_trajectory__deg.push_back  (round4(value[state]/DEG)); break;
+            case PRESENT_TEMPERTURE:   msg.temperature__degC.push_back    (round4(value[state]    )); break;
+            case PRESENT_INPUT_VOLTAGE:msg.input_voltage__V.push_back     (round4(value[state]    )); break;
         }
     }
     pub_state_.publish(msg);
