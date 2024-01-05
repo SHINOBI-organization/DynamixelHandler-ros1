@@ -116,9 +116,9 @@ bool DynamixelHandler::TorqueOn(uint8_t id){
         /*トルクを入れる*/WriteTorqueEnable(id, true);
     }
     // 結果を確認
-    bool is_enable = (ReadTorqueEnable(id) == TORQUE_ENABLE);
-    if ( !is_enable ) ROS_ERROR("ID [%d] failed to enable torque", id);
-    return is_enable;
+    tq_mode_[id] = (ReadTorqueEnable(id) == TORQUE_ENABLE);
+    if ( !tq_mode_[id] ) ROS_ERROR("ID [%d] failed to enable torque", id);
+    return tq_mode_[id];
 }
 
 // トルクを切る
@@ -127,9 +127,9 @@ bool DynamixelHandler::TorqueOff(uint8_t id){
     // トルクを切る
     WriteTorqueEnable(id, false);
     // 結果を確認
-    bool is_disable = (ReadTorqueEnable(id) == TORQUE_DISABLE);
-    if ( !is_disable ) ROS_ERROR("ID [%d] failed to disable torque", id);
-    return is_disable;
+    tq_mode_[id] = (ReadTorqueEnable(id) == TORQUE_DISABLE);
+    if ( !tq_mode_[id] ) ROS_ERROR("ID [%d] failed to disable torque", id);
+    return tq_mode_[id];
 }
 
 //* 基本機能たち Read

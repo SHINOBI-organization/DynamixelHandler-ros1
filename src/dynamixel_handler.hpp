@@ -206,7 +206,9 @@ class DynamixelHandler {
         static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
         static inline map<uint8_t, uint16_t> series_; // 各dynamixelの id と series のマップ
         // 連結しているサーボの個々の状態を保持するmap
+        static inline map<uint8_t, bool> tq_mode_;    // 各dynamixelの id と トルクON/OFF のマップ
         static inline map<uint8_t, uint8_t> op_mode_; // 各dynamixelの id と 制御モード のマップ
+        static inline map<uint8_t, uint8_t> dv_mode_; // 各dynamixelの id と ドライブモード のマップ
         static inline map<uint8_t, array<double, 6>> cmd_values_;  // 各dynamixelの id と サーボに毎周期で書き込むことができる値のマップ, 中身の並びはCmdValueIndexに対応する
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身の並びはStValueIndexに対応する
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身の並びはHWErrIndexに対応する
@@ -246,11 +248,11 @@ static string control_table_layout(int width, const map<uint8_t, vector<int64_t>
     map<uint8_t, vector<int64_t>> first(id_data_map.begin(), prev(id_data_map.end(), id_data_map.size() - width));
     map<uint8_t, vector<int64_t>> second(next(id_data_map.begin(), width), id_data_map.end());
     // 分割した前半を処理
-    ss << "\n" << " ID :"; 
+    ss << "\n" << "ADDR|"; 
     for (const auto& [id, data] : first)         
         ss << "  [" << setw(3) << (int)id << "] "; ss << "\n";
     for (size_t i = 0; i < dp_list.size(); ++i) {
-        ss << "-" << setw(4) << dp_list[i].address() ;
+        ss << "-" << setw(3) << dp_list[i].address() << "|" ;
         for (const auto& [id, data] : first)
             ss << std::setfill(' ') << setw(7) << data[i] << " "; ss << "\n";
     }

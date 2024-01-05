@@ -179,11 +179,64 @@ double DynamixelHandler::SyncReadHardwareErrors(){
 }
 
 double DynamixelHandler::SyncReadOption_Mode(){
+    vector<uint8_t> target_id_list;
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
+
+    auto id_torque_map = dyn_comm_.SyncRead(torque_enable, target_id_list);
+    auto id_dv_op_mode_map = dyn_comm_.SyncRead({drive_mode, operating_mode}, target_id_list);
+
+    for ( const auto& [id, toqrue] : id_torque_map ) tq_mode_[id] = toqrue;
+    for ( const auto& [id, dv_op]  : id_dv_op_mode_map ) {
+        dv_mode_[id] = dv_op[0];
+        op_mode_[id] = dv_op[1];
+    }
     return 1.0;
 }
 
 double DynamixelHandler::SyncReadOption_Gain(){
-    return 1.0;
+    OptGainIndex start = VELOCITY_I_GAIN;
+    OptGainIndex end   = FEEDFORWARD_VEL_GAIN;
+    vector<DynamixelAddress> opt_gain_dp_list;
+    for (OptGainIndex g=start; g<=end; g++) switch ( g ) {
+        case VELOCITY_I_GAIN     : opt_gain_dp_list.push_back(velocity_i_gain     ); break;
+        case VELOCITY_P_GAIN     : opt_gain_dp_list.push_back(velocity_p_gain     ); break;
+        case POSITION_D_GAIN     : opt_gain_dp_list.push_back(position_d_gain     ); break;
+        case POSITION_I_GAIN     : opt_gain_dp_list.push_back(position_i_gain     ); break;
+        case POSITION_P_GAIN     : opt_gain_dp_list.push_back(position_p_gain     ); break;
+        case FEEDFORWARD_ACC_GAIN: opt_gain_dp_list.push_back(feedforward_acc_gain); break;
+        case FEEDFORWARD_VEL_GAIN: opt_gain_dp_list.push_back(feedforward_vel_gain); break;
+        default: /*ここに来たらエラ-*/ exit(1);
+    }
+
+    vector<uint8_t> target_id_list;
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
+
+    auto id_gain_vec_map = ( use_fast_read_ )
+        ? dyn_comm_.SyncRead_fast(opt_gain_dp_list, target_id_list)
+        : dyn_comm_.SyncRead     (opt_gain_dp_list, target_id_list);
+    const bool is_timeout   = dyn_comm_.timeout_last_read();
+    const bool has_comm_err = dyn_comm_.comm_error_last_read();
+    // 通信エラーの表示
+    if ( varbose_read_opt_err_ ) if ( has_comm_err || is_timeout ) {
+        vector<uint8_t> failed_id_list;
+        for ( auto id : target_id_list ) if ( id_gain_vec_map.find(id) == id_gain_vec_map.end() ) failed_id_list.push_back(id);
+        char header[100]; sprintf(header, "[%d] servo(s) failed to read", (int)(target_id_list.size() - id_gain_vec_map.size()));
+        auto ss = id_list_layout(failed_id_list, string(header) + (is_timeout? " (time out)" : " (some kind packet error)"));
+        ROS_WARN_STREAM(ss);
+    }
+    // id_gain_vec_mapの中身を確認
+    if ( varbose_read_opt_ ) if ( id_gain_vec_map.size()>0 ) {
+        char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_gain_vec_map.size());
+        auto ss = control_table_layout(width_log_, id_gain_vec_map, opt_gain_dp_list, string(header));
+        ROS_INFO_STREAM(ss);
+    }
+    // option_gain_に反映
+    for ( auto opt_gain=0; opt_gain<opt_gain_dp_list.size(); opt_gain++) {
+        DynamixelAddress dp = opt_gain_dp_list[opt_gain];
+        for (const auto& [id, data_int] : id_gain_vec_map)
+            option_gain_[id][opt_gain] = dp.pulse2val( data_int[opt_gain], model_[id] );
+    }
+    return id_gain_vec_map.size() / (double)target_id_list.size();
 }
 
 double DynamixelHandler::SyncReadOption_Limit(){

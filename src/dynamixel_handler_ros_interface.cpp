@@ -271,8 +271,37 @@ void DynamixelHandler::BroadcastDxlOpt_Limit(){
 }
 
 void DynamixelHandler::BroadcastDxlOpt_Gain(){
-
+    dynamixel_handler::DynamixelOption_Gain msg;
+    msg.stamp = ros::Time::now();
+    for ( const auto& [id, gain] : option_gain_ ) {
+        msg.id_list.push_back(id);
+        msg.velocity_i_gain__pulse.push_back     (gain[VELOCITY_I_GAIN     ]);
+        msg.velocity_p_gain__pulse.push_back     (gain[VELOCITY_P_GAIN     ]);
+        msg.position_d_gain__pulse.push_back     (gain[POSITION_D_GAIN     ]);
+        msg.position_i_gain__pulse.push_back     (gain[POSITION_I_GAIN     ]);
+        msg.position_p_gain__pulse.push_back     (gain[POSITION_P_GAIN     ]);
+        msg.feedforward_acc_gain__pulse.push_back(gain[FEEDFORWARD_ACC_GAIN]);
+        msg.feedforward_vel_gain__pulse.push_back(gain[FEEDFORWARD_VEL_GAIN]);
+    }
+    pub_opt_gain_.publish(msg);
 }
 
 void DynamixelHandler::BroadcastDxlOpt_Mode(){
+    dynamixel_handler::DynamixelOption_Mode msg;
+    msg.stamp = ros::Time::now();
+    for ( const auto& id : id_list_ ) {
+        msg.id_list.push_back(id);
+        msg.torque_enable.push_back(tq_mode_[id]);
+        switch(op_mode_[id]) {
+            case OPERATING_MODE_CURRENT:              msg.operating_mode.push_back("current");           break;
+            case OPERATING_MODE_VELOCITY:             msg.operating_mode.push_back("velocity");          break;
+            case OPERATING_MODE_POSITION:             msg.operating_mode.push_back("position");          break;
+            case OPERATING_MODE_EXTENDED_POSITION:    msg.operating_mode.push_back("extended_position"); break;
+            case OPERATING_MODE_CURRENT_BASE_POSITION:msg.operating_mode.push_back("current_position");  break;
+        }
+        switch(dv_mode_[id]) {
+            default: msg.drive_mode.push_back("unknown"); break;
+        }
+    }
+    pub_opt_mode_.publish(msg);
 }
