@@ -2,6 +2,9 @@
 
 using namespace dyn_x;
 
+template <typename T>
+bool is_in(const T& val, const std::vector<T>& vec) { return std::find(vec.begin(), vec.end(), val) != vec.end(); }
+
 //* ROS関係
 
 void DynamixelHandler::CallBackDxlCommand(const dynamixel_handler::DynamixelCommand& msg) {
@@ -25,76 +28,100 @@ void DynamixelHandler::CallBackDxlCommand(const dynamixel_handler::DynamixelComm
 }
 
 void DynamixelHandler::CallBackDxlCommand_Profile(const dynamixel_handler::DynamixelCommand_Profile& msg) {
-    if (varbose_callback_) ROS_INFO("CallBackDxlCommand_Profile"); // msg.id_listと同じサイズの奴だけ処理する
     const bool do_process_vel = msg.id_list.size() == msg.profile_velocity__deg_s.size();
     const bool do_process_acc = msg.id_list.size() == msg.profile_acceleration__deg_ss.size();
-    if ( !do_process_vel && !do_process_acc ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
+    if ( !do_process_vel && !do_process_acc ) { if (varbose_callback_) ROS_ERROR("Element size all dismatch; skip callback."); return;}
 
+    vector<uint8_t> store_id_list_vel, store_id_list_acc;
     for (int i=0; i<msg.id_list.size(); i++){
-        int id = msg.id_list[i];
+        uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
         auto limit = option_limit_[id];
         if ( do_process_vel ){
             auto vel = msg.profile_velocity__deg_s[i];
             cmd_values_[id][PROFILE_VEL] = clamp( deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT] );
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(PROFILE_VEL);
+            store_id_list_vel.push_back(id);
         }
         if ( do_process_acc ){
             auto acc = msg.profile_acceleration__deg_ss[i];
             cmd_values_[id][PROFILE_ACC] = clamp( deg2rad(acc), -limit[ACCELERATION_LIMIT], limit[ACCELERATION_LIMIT] );
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(PROFILE_ACC);
+            store_id_list_acc.push_back(id);
         }
     }
-    if (varbose_callback_) ROS_INFO(" - %d servo(s) profile are updated", (int)msg.id_list.size());
+    if (varbose_callback_ && do_process_vel ) {
+        char header[99]; sprintf(header, "[%d] servo(s) profile_velocity are updated", (int)store_id_list_vel.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list_vel, string(header)) );
+    }
+    if (varbose_callback_ && do_process_acc ) {
+        char header[99]; sprintf(header, "[%d] servo(s) profile_velocity are updated", (int)store_id_list_acc.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list_vel, string(header)) );
+    }
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
     if (varbose_callback_) ROS_INFO("msg generate time: %f", msg.stamp.toSec());  // ↓msg.id_listと同じサイズの奴だけ処理する
-    if ( msg.id_list.size() != msg.position__deg.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
+    if ( msg.id_list.size() != msg.position__deg.size() ) { if (varbose_callback_) ROS_ERROR("Element size all dismatch; skip callback."); return;}
 
+    vector<uint8_t> store_id_list;
     for (int i = 0; i < msg.id_list.size(); i++) {
-        int id = msg.id_list[i];
+        uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
         auto pos = msg.position__deg[i];
         auto limit = option_limit_[id];
         cmd_values_[id][GOAL_POSITION] = clamp(deg2rad(pos), limit[MIN_POSITION_LIMIT], limit[MAX_POSITION_LIMIT]);
         is_cmd_updated_[id] = true;
         list_write_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_POSITION); // 副作用で変更する場合だけトルクが入ってしまう．
+        store_id_list.push_back(id);
     }
-    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
+    if (varbose_callback_) {
+        char header[99]; sprintf(header, "[%d] servo(s) goal_position are updated", (int)store_id_list.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list, string(header)) );
+    }
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Velocity(const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Velocity"); // msg.id_listと同じサイズの奴だけ処理する
     if ( msg.id_list.size() != msg.velocity__deg_s.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
+    vector<uint8_t> store_id_list;
     for (int i = 0; i < msg.id_list.size(); i++) {
-        int id = msg.id_list[i];
+        uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
         auto vel = msg.velocity__deg_s[i];
         auto limit = option_limit_[id];
         cmd_values_[id][GOAL_VELOCITY] = clamp(deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT]);
         is_cmd_updated_[id] = true;
         list_write_cmd_.insert(GOAL_VELOCITY);
         ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
+        store_id_list.push_back(id);
     }
-    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_velocity are updated", (int)msg.id_list.size());
+    if (varbose_callback_) {
+        char header[99]; sprintf(header, "[%d] servo(s) goal_velocity are updated", (int)store_id_list.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list, string(header)) );
+    }
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_Current(const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg) {
     if (varbose_callback_) ROS_INFO("CallBackDxlCommand_X_Current"); // msg.id_listと同じサイズの奴だけ処理する
     if ( msg.id_list.size() != msg.current__mA.size() ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
+    vector<uint8_t> store_id_list;
     for (int i = 0; i < msg.id_list.size(); i++) {
-        int id = msg.id_list[i];
+        uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
         auto cur = msg.current__mA[i];
         auto limit = option_limit_[id];
         cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
         is_cmd_updated_[id] = true;
         list_write_cmd_.insert(GOAL_CURRENT);
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
+        store_id_list.push_back(id);
     }
-    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_current are updated", (int)msg.id_list.size());
+    if ( varbose_callback_ ) {
+        char header[99]; sprintf(header, "[%d] servo(s) goal_current are updated", (int)store_id_list.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list, string(header)) );
+    }
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_handler::DynamixelCommand_X_ControlCurrentPosition& msg) {
@@ -103,8 +130,9 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
     const bool do_process_pos = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
     if ( !do_process_cur && !do_process_pos ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
+    vector<uint8_t> store_id_list_pos, store_id_list_cur;
     for (int i = 0; i < msg.id_list.size(); i++) {
-        int id = msg.id_list[i];
+        uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
         auto limit = option_limit_[id];
         if ( do_process_pos ){
             auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
@@ -112,17 +140,25 @@ void DynamixelHandler::CallBackDxlCommand_X_CurrentPosition(const dynamixel_hand
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
             list_write_cmd_.insert(GOAL_POSITION);
+            store_id_list_pos.push_back(id);
         }
         if ( do_process_cur ){
             auto cur = msg.current__mA[i];
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_CURRENT] = clamp(cur, 0.0, limit[CURRENT_LIMIT]);
             list_write_cmd_.insert(GOAL_CURRENT);
+            store_id_list_cur.push_back(id);
         }
         ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
     }
-    if (varbose_callback_ && do_process_cur) ROS_INFO(" - %d servo(s) goal_current are updated", (int)msg.id_list.size());
-    if (varbose_callback_ && do_process_pos) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
+    if (varbose_callback_ && do_process_pos ) {
+        char header[99]; sprintf(header, "[%d] servo(s) goal_position are updated", (int)store_id_list_pos.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list_pos, string(header)) );
+    }
+    if (varbose_callback_ && do_process_cur ) {
+        char header[99]; sprintf(header, "[%d] servo(s) goal_current are updated", (int)store_id_list_cur.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list_cur, string(header)) );
+    }
 }
 
 void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg) {
@@ -130,16 +166,21 @@ void DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition(const dynamixel_han
     const bool do_process = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
     if ( !do_process ) { if (varbose_callback_) ROS_ERROR(" - Element size dismatch"); return;}
 
+    vector<uint8_t> store_id_list;
     for (int i = 0; i < msg.id_list.size(); i++) {
-        int id = msg.id_list[i];
+        uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
         auto pos = msg.id_list.size() == msg.position__deg.size() ? msg.position__deg[i] : 0.0;
         auto rot = msg.id_list.size() == msg.rotation.size()      ? msg.rotation[i]      : 0;
         is_cmd_updated_[id] = true;
         cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
         list_write_cmd_.insert(GOAL_POSITION);
         ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
+        store_id_list.push_back(id);
     }
-    if (varbose_callback_) ROS_INFO(" - %d servo(s) goal_position are updated", (int)msg.id_list.size());
+    if (varbose_callback_) {
+        char header[99]; sprintf(header, "[%d] servo(s) goal_position are updated", (int)store_id_list.size());
+        ROS_INFO_STREAM( id_list_layout(store_id_list, string(header)) );
+    }
 }
 
 void DynamixelHandler::CallBackDxlOption_Gain(const dynamixel_handler::DynamixelOption_Gain& msg) {
@@ -204,13 +245,13 @@ void DynamixelHandler::BroadcastDxlState(){
 void DynamixelHandler::BroadcastDxlError(){
     dynamixel_handler::DynamixelError msg;
     msg.stamp = ros::Time::now();
-    for (auto id : id_list_) {
-        if (hardware_error_[id][INPUT_VOLTAGE     ]) msg.input_voltage.push_back     (id);
-        if (hardware_error_[id][MOTOR_HALL_SENSOR ]) msg.motor_hall_sensor.push_back (id);
-        if (hardware_error_[id][OVERHEATING       ]) msg.overheating.push_back       (id);
-        if (hardware_error_[id][MOTOR_ENCODER     ]) msg.motor_encoder.push_back     (id);
-        if (hardware_error_[id][ELECTRONICAL_SHOCK]) msg.electronical_shock.push_back(id);
-        if (hardware_error_[id][OVERLOAD          ]) msg.overload.push_back          (id);
+    for (const auto& [id, error]: hardware_error_) {
+        if (error[INPUT_VOLTAGE     ]) msg.input_voltage.push_back     (id);
+        if (error[MOTOR_HALL_SENSOR ]) msg.motor_hall_sensor.push_back (id);
+        if (error[OVERHEATING       ]) msg.overheating.push_back       (id);
+        if (error[MOTOR_ENCODER     ]) msg.motor_encoder.push_back     (id);
+        if (error[ELECTRONICAL_SHOCK]) msg.electronical_shock.push_back(id);
+        if (error[OVERLOAD          ]) msg.overload.push_back          (id);
     }
     pub_error_.publish(msg);
 }

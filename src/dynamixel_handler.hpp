@@ -221,68 +221,10 @@ class DynamixelHandler {
 };
 
 namespace dyn_x{
-const static vector<DynamixelAddress> cmd_dp_list = { // この順序が大事，CmdValueIndexと対応
-        goal_pwm            ,
-        goal_current        ,
-        goal_velocity       ,
-        profile_acceleration,
-        profile_velocity    ,
-        goal_position       
-    };
-const static vector<DynamixelAddress> state_dp_list = { // この順序が大事，StValueIndexと対応
-        present_pwm, 
-        present_current, 
-        present_velocity, 
-        present_position,
-        velocity_trajectory,   
-        position_trajectory,  
-        present_input_voltage, 
-        present_temperture    
-    }; 
 const static vector<DynamixelAddress> opt_limit_dp_list = { // この順序が大事，OptLimitIndexと対応
-        temperature_limit ,
-        max_voltage_limit ,
-        min_voltage_limit ,
-        pwm_limit         ,
-        current_limit     ,
-        acceleration_limit,
-        velocity_limit    ,
-        max_position_limit,
-        min_position_limit,
+
     };
 } // namespace dyn_x
-
-namespace dyn_p{
-const static vector<DynamixelAddress> cmd_dp_list = { // この順序が大事
-        goal_pwm,
-        goal_current,
-        goal_velocity,
-        profile_acceleration,
-        profile_velocity,
-        goal_position
-    };
-const static vector<DynamixelAddress> state_dp_list = { // この順序が大事
-        present_pwm, 
-        present_current, 
-        present_velocity, 
-        present_position,
-        velocity_trajectory,   
-        position_trajectory,  
-        present_input_voltage, 
-        present_temperture    
-    }; 
-const static vector<DynamixelAddress> opt_limit_dp_list = { // この順序が大事
-        temperature_limit ,
-        max_voltage_limit ,
-        min_voltage_limit ,
-        pwm_limit         ,
-        current_limit     ,
-        acceleration_limit,
-        velocity_limit    ,
-        max_position_limit,
-        min_position_limit,
-    };
-} // namespace dyn_p
 
 using std::setw;
 using std::prev;
@@ -292,11 +234,11 @@ static string control_table_layout(int width, const map<uint8_t, vector<int64_t>
     std::stringstream ss;
     ss << header;
     if (id_data_map.empty()) return ss.str();
-
+    // width 以上のID数がある場合は，再帰させることで，縦に並べる
 	width = min(width, (int)id_data_map.size());
     map<uint8_t, vector<int64_t>> first(id_data_map.begin(), prev(id_data_map.end(), id_data_map.size() - width));
     map<uint8_t, vector<int64_t>> second(next(id_data_map.begin(), width), id_data_map.end());
-
+    // 分割した前半を処理
     ss << "\n" << " ID :"; 
     for (const auto& [id, data] : first)         
         ss << "  [" << setw(3) << (int)id << "] "; ss << "\n";
@@ -305,7 +247,7 @@ static string control_table_layout(int width, const map<uint8_t, vector<int64_t>
         for (const auto& [id, data] : first)
             ss << std::setfill(' ') << setw(7) << data[i] << " "; ss << "\n";
     }
-    
+    // 分割した前半に後半を処理したものを追加する
     return ss.str() + control_table_layout(width, second, dp_list);
 }
 
