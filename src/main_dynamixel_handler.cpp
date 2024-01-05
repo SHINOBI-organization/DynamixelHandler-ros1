@@ -10,15 +10,15 @@ bool DynamixelHandler::TmpTest(){
 bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     // Subscriber / Publisherの設定
     sub_command_    = nh.subscribe("/dynamixel/command",    10, DynamixelHandler::CallBackDxlCommand);
-    sub_cmd_profile_= nh.subscribe("/dynamixel/cmd/profile", 10, DynamixelHandler::CallBackDxlCommand_Profile);
-    sub_cmd_x_pos_  = nh.subscribe("/dynamixel/cmd/x/position", 10, DynamixelHandler::CallBackDxlCommand_X_Position);
-    sub_cmd_x_vel_  = nh.subscribe("/dynamixel/cmd/x/velocity", 10, DynamixelHandler::CallBackDxlCommand_X_Velocity);
-    sub_cmd_x_cur_  = nh.subscribe("/dynamixel/cmd/x/current",  10, DynamixelHandler::CallBackDxlCommand_X_Current);
-    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/cmd/x/current_position",  10, DynamixelHandler::CallBackDxlCommand_X_CurrentPosition);
-    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/cmd/x/extended_position", 10, DynamixelHandler::CallBackDxlCommand_X_ExtendedPosition);
-    sub_opt_gain_ = nh.subscribe("/dynamixel/opt/gain/w", 10, DynamixelHandler::CallBackDxlOption_Gain);
-    sub_opt_mode_ = nh.subscribe("/dynamixel/opt/mode/w", 10, DynamixelHandler::CallBackDxlOption_Mode);
-    sub_opt_limit_= nh.subscribe("/dynamixel/opt/limit/w",10, DynamixelHandler::CallBackDxlOption_Limit);
+    sub_cmd_profile_= nh.subscribe("/dynamixel/cmd/profile", 10, DynamixelHandler::CallBackDxlCmd_Profile);
+    sub_cmd_x_pos_  = nh.subscribe("/dynamixel/cmd/x/position", 10, DynamixelHandler::CallBackDxlCmd_X_Position);
+    sub_cmd_x_vel_  = nh.subscribe("/dynamixel/cmd/x/velocity", 10, DynamixelHandler::CallBackDxlCmd_X_Velocity);
+    sub_cmd_x_cur_  = nh.subscribe("/dynamixel/cmd/x/current",  10, DynamixelHandler::CallBackDxlCmd_X_Current);
+    sub_cmd_x_cpos_ = nh.subscribe("/dynamixel/cmd/x/current_position",  10, DynamixelHandler::CallBackDxlCmd_X_CurrentPosition);
+    sub_cmd_x_epos_ = nh.subscribe("/dynamixel/cmd/x/extended_position", 10, DynamixelHandler::CallBackDxlCmd_X_ExtendedPosition);
+    sub_opt_gain_ = nh.subscribe("/dynamixel/opt/gain/w", 10, DynamixelHandler::CallBackDxlOpt_Gain);
+    sub_opt_mode_ = nh.subscribe("/dynamixel/opt/mode/w", 10, DynamixelHandler::CallBackDxlOpt_Mode);
+    sub_opt_limit_= nh.subscribe("/dynamixel/opt/limit/w",10, DynamixelHandler::CallBackDxlOpt_Limit);
 
     pub_state_     = nh.advertise<dynamixel_handler::DynamixelState>("/dynamixel/state", 10);
     pub_error_     = nh.advertise<dynamixel_handler::DynamixelError>("/dynamixel/error", 10);
@@ -97,11 +97,11 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     ROS_INFO("Reading present dynamixel state  ...");
     while ( ros::ok() && SyncReadStateValues()    < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlState();
     while ( ros::ok() && SyncReadHardwareErrors() < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlError();
-    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Limit();
-    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Gain();
-    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Mode();
-    // while ( ros::ok() && SyncReadOption_Config()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Config();
-    // while ( ros::ok() && SyncReadOption_Extra()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOption_Extra();
+    while ( ros::ok() && SyncReadOption_Limit() < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOpt_Limit();
+    while ( ros::ok() && SyncReadOption_Gain()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOpt_Gain();
+    while ( ros::ok() && SyncReadOption_Mode()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOpt_Mode();
+    // while ( ros::ok() && SyncReadOption_Config()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOpt_Config();
+    // while ( ros::ok() && SyncReadOption_Extra()  < 1.0-1e-6 ) rsleep(0.05); BroadcastDxlOpt_Extra();
 
     // cmd_values_の内部の情報の初期化, cmd_values_はreadする関数を持ってないので以下の様に手動で．
     for (auto id : id_list_) if (series_[id] == SERIES_X) { // Xシリーズのみ
@@ -180,11 +180,11 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
     if ( ratio_option_pub_!=0 )
     if ( cnt % ratio_option_pub_ == 0 ) { // ratio_option_pub_の割合で実行
         double rate_suc_lim = SyncReadOption_Limit(); // 処理を追加する可能性を考えて，変数を別で用意する冗長な書き方をしている．
-        if ( rate_suc_lim >0.0 ) BroadcastDxlOption_Limit();
+        if ( rate_suc_lim >0.0 ) BroadcastDxlOpt_Limit();
         double rate_suc_gain = SyncReadOption_Gain();
-        if ( rate_suc_gain>0.0 ) BroadcastDxlOption_Gain();
+        if ( rate_suc_gain>0.0 ) BroadcastDxlOpt_Gain();
         double rate_suc_mode = SyncReadOption_Mode();
-        if ( rate_suc_mode>0.0 ) BroadcastDxlOption_Mode();
+        if ( rate_suc_mode>0.0 ) BroadcastDxlOpt_Mode();
     }
 
     //* デバック
