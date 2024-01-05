@@ -131,6 +131,7 @@ class DynamixelHandler {
         static bool WriteHomingOffset(uint8_t servo_id, double offset);
         static bool WriteOperatingMode(uint8_t servo_id, uint8_t mode);
         static bool WriteBusWatchdog(uint8_t servo_id, double time);
+        static bool WriteGains(uint8_t servo_id, array<int64_t, 7> gains);
     
         //* 各種のフラグとパラメータ
         static inline int  ratio_state_pub_  = 1; 
@@ -191,6 +192,15 @@ class DynamixelHandler {
             MAX_POSITION_LIMIT = 7,
             MIN_POSITION_LIMIT = 8,
         };
+        enum OptGainIndex { // opt_gain_のIndex, 各種のゲイン値
+            VELOCITY_I_GAIN      = 0,
+            VELOCITY_P_GAIN      = 1,
+            POSITION_D_GAIN      = 2,
+            POSITION_I_GAIN      = 3,
+            POSITION_P_GAIN      = 4,
+            FEEDFORWARD_ACC_GAIN = 5,
+            FEEDFORWARD_VEL_GAIN = 6,            
+        };
         // 連結したサーボの基本情報
         static inline vector<uint8_t> id_list_; // chained dynamixel id list
         static inline map<uint8_t, uint16_t> model_; // 各dynamixelの id と model のマップ
@@ -201,6 +211,7 @@ class DynamixelHandler {
         static inline map<uint8_t, array<double, 8>> state_values_;// 各dynamixelの id と サーボから毎周期で読み込むことができる値のマップ, 中身の並びはStValueIndexに対応する
         static inline map<uint8_t, array<bool,   6>> hardware_error_; // 各dynamixelの id と サーボが起こしたハードウェアエラーのマップ, 中身の並びはHWErrIndexに対応する
         static inline map<uint8_t, array<double, 9>> option_limit_; // 各dynamixelの id と サーボの各種制限値のマップ, 中身の並びはOptLimitIndexに対応する 
+        static inline map<uint8_t, array<int64_t,7>> option_gain_; // 各dynamixelの id と サーボの各種制限値のマップ, 中身の並びはOptGainIndexに対応する 
         // 上記の変数を適切に使うための補助的なフラグ
         static inline map<uint8_t, Time> when_op_mode_updated_; // 各dynamixelの id と op_mode_ が更新された時刻のマップ
         static inline map<uint8_t, bool> is_cmd_updated_;      // topicのcallbackによって，cmd_valuesが更新されたかどうかを示すマップ

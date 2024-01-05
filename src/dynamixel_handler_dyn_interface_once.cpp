@@ -251,15 +251,14 @@ bool DynamixelHandler::WriteBusWatchdog(uint8_t id, double time){
     return dyn_comm_.tryWrite(bus_watchdog, id, time_pulse);
 }
 
-// bool DynamixelHandler::WriteGains(uint8_t id, array<int64_t, 7> gains){
-    // if ( gains.size() != 8 ) return false;
-    // bool is_success = true;
-    // is_success &= dyn_comm_.tryWrite(velocity_i_gain, id, gains[0]);
-    // is_success &= dyn_comm_.tryWrite(velocity_p_gain, id, gains[1]);
-    // is_success &= dyn_comm_.tryWrite(position_d_gain, id, gains[2]);
-    // is_success &= dyn_comm_.tryWrite(position_i_gain, id, gains[3]);
-    // is_success &= dyn_comm_.tryWrite(position_p_gain, id, gains[4]);
-    // is_success &= dyn_comm_.tryWrite(feedforward_acc_gain, id, gains[5]);
-    // is_success &= dyn_comm_.tryWrite(feedforward_vel_gain, id, gains[6]);
-    // return is_success;
-// }
+bool DynamixelHandler::WriteGains(uint8_t id, array<int64_t, 7> gains){
+    bool is_success = true;
+    is_success &= dyn_comm_.tryWrite(velocity_i_gain, id, gains[VELOCITY_I_GAIN]);
+    is_success &= dyn_comm_.tryWrite(velocity_p_gain, id, gains[VELOCITY_P_GAIN]);
+    is_success &= dyn_comm_.tryWrite(position_d_gain, id, gains[POSITION_D_GAIN]);
+    is_success &= dyn_comm_.tryWrite(position_i_gain, id, gains[POSITION_I_GAIN]);
+    is_success &= dyn_comm_.tryWrite(position_p_gain, id, gains[POSITION_P_GAIN]);
+    is_success &= dyn_comm_.tryWrite(feedforward_acc_gain, id, gains[FEEDFORWARD_ACC_GAIN]);
+    is_success &= dyn_comm_.tryWrite(feedforward_vel_gain, id, gains[FEEDFORWARD_VEL_GAIN]);
+    return is_success;
+}
