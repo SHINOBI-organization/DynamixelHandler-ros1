@@ -231,11 +231,7 @@ class DynamixelHandler {
         static double SyncReadOption_Limit(); // todo
 };
 
-namespace dyn_x{
-const static vector<DynamixelAddress> opt_limit_dp_list = { // この順序が大事，OptLimitIndexと対応
-
-    };
-} // namespace dyn_x
+// ちょっとした文字列の整形を行う補助関数
 
 using std::setw;
 using std::prev;
