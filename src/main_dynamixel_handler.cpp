@@ -25,6 +25,7 @@ bool DynamixelHandler::Initialize(ros::NodeHandle& nh){
     pub_opt_limit_ = nh.advertise<dynamixel_handler::DynamixelOption_Limit>("/dynamixel/opt/limit/r", 10);
     pub_opt_gain_  = nh.advertise<dynamixel_handler::DynamixelOption_Gain>("/dynamixel/opt/gain/r", 10);
     pub_opt_mode_  = nh.advertise<dynamixel_handler::DynamixelOption_Mode>("/dynamixel/opt/mode/r", 10);
+    pub_opt_goal_  = nh.advertise<dynamixel_handler::DynamixelOption_Goal>("/dynamixel/opt/goal/r", 10);
 
     ros::NodeHandle nh_p("~");
 
@@ -185,6 +186,8 @@ void DynamixelHandler::MainLoop(const ros::TimerEvent& e){
         if ( rate_suc_gain>0.0 ) BroadcastDxlOpt_Gain();
         double rate_suc_mode = SyncReadOption_Mode();
         if ( rate_suc_mode>0.0 ) BroadcastDxlOpt_Mode();
+        double rate_suc_goal = SyncReadOption_Goal();
+        if ( rate_suc_goal>0.0 ) BroadcastDxlOpt_Goal();
     }
 
     //* デバック

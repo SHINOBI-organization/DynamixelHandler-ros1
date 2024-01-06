@@ -62,6 +62,7 @@ add_message_files(
   DynamixelOption_Config.msg
   DynamixelOption_Extra.msg
   DynamixelOption_Gain.msg
+  DynamixelOption_Goal.msg
   DynamixelOption_Limit.msg
   DynamixelOption_Mode.msg
     

@@ -299,3 +299,47 @@ double DynamixelHandler::SyncReadOption_Limit(){
     }
     return id_limit_vec_map.size() / (double)target_id_list.size();
 }
+
+double DynamixelHandler::SyncReadOption_Goal() {
+    CmdValueIndex start = GOAL_PWM;
+    CmdValueIndex end   = GOAL_POSITION;
+    vector<DynamixelAddress> opt_goal_dp_list;
+    for (CmdValueIndex g=start; g<=end; g++) switch ( g ) {
+        case GOAL_PWM      : opt_goal_dp_list.push_back(goal_pwm      ); break;
+        case GOAL_CURRENT  : opt_goal_dp_list.push_back(goal_current  ); break;
+        case GOAL_VELOCITY : opt_goal_dp_list.push_back(goal_velocity ); break;
+        case PROFILE_ACC   : opt_goal_dp_list.push_back(profile_acceleration); break;
+        case PROFILE_VEL   : opt_goal_dp_list.push_back(profile_velocity    ); break;
+        case GOAL_POSITION : opt_goal_dp_list.push_back(goal_position       ); break;
+        default: /*ここに来たらエラ-*/ exit(1);
+    }
+
+    vector<uint8_t> target_id_list;
+    for (int id : id_list_) if ( series_[id]==SERIES_X ) target_id_list.push_back(id);
+
+    auto id_goal_vec_map = ( use_fast_read_ )
+        ? dyn_comm_.SyncRead_fast(opt_goal_dp_list, target_id_list)
+        : dyn_comm_.SyncRead     (opt_goal_dp_list, target_id_list);
+    const bool is_timeout   = dyn_comm_.timeout_last_read();
+    const bool has_comm_err = dyn_comm_.comm_error_last_read();
+    // 通信エラーの表示
+    if ( varbose_read_opt_err_ ) if ( has_comm_err || is_timeout ) {
+        vector<uint8_t> failed_id_list;
+        for ( auto id : target_id_list ) if ( id_goal_vec_map.find(id) == id_goal_vec_map.end() ) failed_id_list.push_back(id);
+        char header[100]; sprintf(header, "[%d] servo(s) failed to read", (int)(target_id_list.size() - id_goal_vec_map.size()));
+        auto ss = id_list_layout(failed_id_list, string(header) + (is_timeout? " (time out)" : " (some kind packet error)"));
+        ROS_WARN_STREAM(ss);
+    }
+    if ( varbose_read_opt_ ) if ( id_goal_vec_map.size()>0 ) {
+        char header[100]; sprintf(header, "[%d] servo(s) are read", (int)id_goal_vec_map.size());
+        auto ss = control_table_layout(width_log_, id_goal_vec_map, opt_goal_dp_list, string(header));
+        ROS_INFO_STREAM(ss);
+    }
+    // option_goal_に反映
+    for ( auto opt_goal=0; opt_goal<opt_goal_dp_list.size(); opt_goal++) {
+        DynamixelAddress dp = opt_goal_dp_list[opt_goal];
+        for (const auto& [id, data_int] : id_goal_vec_map)
+            option_goal_[id][opt_goal] = dp.pulse2val( data_int[opt_goal], model_[id] );
+    }
+    return id_goal_vec_map.size() / (double)target_id_list.size();
+}

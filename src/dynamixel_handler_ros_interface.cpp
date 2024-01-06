@@ -34,14 +34,14 @@ void DynamixelHandler::CallBackDxlCommand(const dynamixel_handler::DynamixelComm
 }
 
 void DynamixelHandler::CallBackDxlCmd_Profile(const dynamixel_handler::DynamixelCommand_Profile& msg) {
-    const bool do_process_vel = msg.id_list.size() == msg.profile_velocity__deg_s.size();
-    const bool do_process_acc = msg.id_list.size() == msg.profile_acceleration__deg_ss.size();
+    const bool do_process_vel = msg.id_list.size() == msg.profile_vel__deg_s.size();
+    const bool do_process_acc = msg.id_list.size() == msg.profile_acc__deg_ss.size();
     if ( do_process_vel ) {
         vector<uint8_t> store_id_list_vel; 
         for (size_t i=0; i<msg.id_list.size(); i++){
             uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
             auto& limit = option_limit_[id];
-            auto vel = msg.profile_velocity__deg_s[i];
+            auto vel = msg.profile_vel__deg_s[i];
             cmd_values_[id][PROFILE_VEL] = clamp( deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT] );
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(PROFILE_VEL);
@@ -54,7 +54,7 @@ void DynamixelHandler::CallBackDxlCmd_Profile(const dynamixel_handler::Dynamixel
         for (size_t i=0; i<msg.id_list.size(); i++){
             uint8_t id = msg.id_list[i]; if ( !is_in(id, id_list_ ) ) continue;
             auto& limit = option_limit_[id];
-            auto acc = msg.profile_acceleration__deg_ss[i];
+            auto acc = msg.profile_acc__deg_ss[i];
             cmd_values_[id][PROFILE_ACC] = clamp( deg2rad(acc), -limit[ACCELERATION_LIMIT], limit[ACCELERATION_LIMIT] );
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(PROFILE_ACC);
@@ -148,7 +148,7 @@ void DynamixelHandler::CallBackDxlCmd_X_CurrentPosition(const dynamixel_handler:
             auto& limit = option_limit_[id];
             auto cur = msg.current__mA[i];
             is_cmd_updated_[id] = true;
-            cmd_values_[id][GOAL_CURRENT] = clamp(cur, 0.0, limit[CURRENT_LIMIT]);
+            cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
             list_write_cmd_.insert(GOAL_CURRENT);
             store_id_list_cur.push_back(id);
         }
@@ -303,4 +303,19 @@ void DynamixelHandler::BroadcastDxlOpt_Mode(){
         }
     }
     pub_opt_mode_.publish(msg);
+}
+
+void DynamixelHandler::BroadcastDxlOpt_Goal(){
+    dynamixel_handler::DynamixelOption_Goal msg;
+    msg.stamp = ros::Time::now();
+    for ( const auto& [id, goal] : option_goal_ ) {
+        msg.id_list.push_back(id);
+        msg.pwm__percent.push_back       (round4(goal[GOAL_PWM         ]));
+        msg.current__mA.push_back        (round4(goal[GOAL_CURRENT     ]));
+        msg.velocity__deg_s.push_back    (round4(goal[GOAL_VELOCITY    ]/DEG));
+        msg.profile_vel__deg_s.push_back (round4(goal[PROFILE_VEL      ]/DEG));
+        msg.profile_acc__deg_ss.push_back(round4(goal[PROFILE_ACC      ]/DEG));
+        msg.position__deg.push_back      (round4(goal[GOAL_POSITION    ]/DEG));
+    }
+    pub_opt_goal_.publish(msg);
 }
