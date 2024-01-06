@@ -66,7 +66,8 @@ void DynamixelHandler::CallBackDxlCmd_Profile(const dynamixel_handler::Dynamixel
 }
 
 void DynamixelHandler::CallBackDxlCmd_X_Position(const dynamixel_handler::DynamixelCommand_X_ControlPosition& msg) {
-    if (varbose_callback_) ROS_INFO("msg generate time: %f", msg.stamp.toSec());  // ↓msg.id_listと同じサイズの奴だけ処理する
+    // if (varbose_callback_) ROS_INFO("msg generate time: %f", msg.stamp.toSec());  // ↓msg.id_listと同じサイズの奴だけ処理する
+    for ( const uint8_t& id : msg.id_list ) if ( is_in(id, id_list_) ) ChangeOperatingMode(id, OPERATING_MODE_POSITION);
     const bool do_process = msg.id_list.size() == msg.position__deg.size();
     if ( do_process ){
         vector<uint8_t> store_id_list;
@@ -77,7 +78,6 @@ void DynamixelHandler::CallBackDxlCmd_X_Position(const dynamixel_handler::Dynami
             cmd_values_[id][GOAL_POSITION] = clamp(deg2rad(pos), limit[MIN_POSITION_LIMIT], limit[MAX_POSITION_LIMIT]);
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(GOAL_POSITION);
-            ChangeOperatingMode(id, OPERATING_MODE_POSITION); // 副作用で変更する場合だけトルクが入ってしまう．
             store_id_list.push_back(id);
         }
         if (varbose_callback_) ROS_INFO_STREAM(update_info(store_id_list, "goal_position"));
@@ -86,6 +86,7 @@ void DynamixelHandler::CallBackDxlCmd_X_Position(const dynamixel_handler::Dynami
 }
 
 void DynamixelHandler::CallBackDxlCmd_X_Velocity(const dynamixel_handler::DynamixelCommand_X_ControlVelocity& msg) {
+    for ( const uint8_t& id : msg.id_list ) if ( is_in(id, id_list_) ) ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
     const bool do_process = msg.id_list.size() == msg.velocity__deg_s.size();
     if ( do_process ){
         vector<uint8_t> store_id_list;
@@ -96,7 +97,6 @@ void DynamixelHandler::CallBackDxlCmd_X_Velocity(const dynamixel_handler::Dynami
             cmd_values_[id][GOAL_VELOCITY] = clamp(deg2rad(vel), -limit[VELOCITY_LIMIT], limit[VELOCITY_LIMIT]);
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(GOAL_VELOCITY);
-            ChangeOperatingMode(id, OPERATING_MODE_VELOCITY);
             store_id_list.push_back(id);
         }
         if (varbose_callback_) ROS_INFO_STREAM(update_info(store_id_list, "goal_velocity"));
@@ -105,6 +105,7 @@ void DynamixelHandler::CallBackDxlCmd_X_Velocity(const dynamixel_handler::Dynami
 }
 
 void DynamixelHandler::CallBackDxlCmd_X_Current(const dynamixel_handler::DynamixelCommand_X_ControlCurrent& msg) {
+    for ( const uint8_t& id : msg.id_list ) if ( is_in(id, id_list_) ) ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
     const bool do_process = msg.id_list.size() == msg.current__mA.size();
     if ( do_process ){
         vector<uint8_t> store_id_list;
@@ -115,7 +116,6 @@ void DynamixelHandler::CallBackDxlCmd_X_Current(const dynamixel_handler::Dynamix
             cmd_values_[id][GOAL_CURRENT] = clamp(cur, -limit[CURRENT_LIMIT], limit[CURRENT_LIMIT]);
             is_cmd_updated_[id] = true;
             list_write_cmd_.insert(GOAL_CURRENT);
-            ChangeOperatingMode(id, OPERATING_MODE_CURRENT);
             store_id_list.push_back(id);
         }
         if ( varbose_callback_ ) ROS_INFO_STREAM(update_info(store_id_list, "goal_current"));
@@ -124,7 +124,7 @@ void DynamixelHandler::CallBackDxlCmd_X_Current(const dynamixel_handler::Dynamix
 }
 
 void DynamixelHandler::CallBackDxlCmd_X_CurrentPosition(const dynamixel_handler::DynamixelCommand_X_ControlCurrentPosition& msg) {
-    const bool do_process_cur = msg.id_list.size() == msg.current__mA.size();
+    for ( const uint8_t& id : msg.id_list ) if ( is_in(id, id_list_) ) ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION); 
     const bool do_process_pos = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
     if ( do_process_pos ){
         vector<uint8_t> store_id_list_pos;
@@ -136,11 +136,11 @@ void DynamixelHandler::CallBackDxlCmd_X_CurrentPosition(const dynamixel_handler:
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
             list_write_cmd_.insert(GOAL_POSITION);
-            ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
             store_id_list_pos.push_back(id);
         }
         if (varbose_callback_ ) ROS_INFO_STREAM(update_info(store_id_list_pos, "goal_position"));
     }
+    const bool do_process_cur = msg.id_list.size() == msg.current__mA.size();
     if ( do_process_cur ){
         vector<uint8_t> store_id_list_cur;
         for (size_t i = 0; i < msg.id_list.size(); i++) {
@@ -150,7 +150,6 @@ void DynamixelHandler::CallBackDxlCmd_X_CurrentPosition(const dynamixel_handler:
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_CURRENT] = clamp(cur, 0.0, limit[CURRENT_LIMIT]);
             list_write_cmd_.insert(GOAL_CURRENT);
-            ChangeOperatingMode(id, OPERATING_MODE_CURRENT_BASE_POSITION);
             store_id_list_cur.push_back(id);
         }
         if (varbose_callback_ ) ROS_INFO_STREAM(update_info(store_id_list_cur, "goal_current"));
@@ -159,6 +158,7 @@ void DynamixelHandler::CallBackDxlCmd_X_CurrentPosition(const dynamixel_handler:
 }
 
 void DynamixelHandler::CallBackDxlCmd_X_ExtendedPosition(const dynamixel_handler::DynamixelCommand_X_ControlExtendedPosition& msg) {
+    for ( const uint8_t& id : msg.id_list ) if ( is_in(id, id_list_) ) ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
     const bool do_process = msg.id_list.size() == msg.position__deg.size() || msg.id_list.size() == msg.rotation.size();
     if ( do_process ) {
         vector<uint8_t> store_id_list;
@@ -169,7 +169,6 @@ void DynamixelHandler::CallBackDxlCmd_X_ExtendedPosition(const dynamixel_handler
             is_cmd_updated_[id] = true;
             cmd_values_[id][GOAL_POSITION] = clamp( deg2rad(pos + rot * 360.0), -256*2*M_PI, 256*2*M_PI );
             list_write_cmd_.insert(GOAL_POSITION);
-            ChangeOperatingMode(id, OPERATING_MODE_EXTENDED_POSITION);
             store_id_list.push_back(id);
         }
         if (varbose_callback_) ROS_INFO_STREAM(update_info(store_id_list, "goal_position"));
