@@ -221,9 +221,9 @@ ros param `use/split_read` によって変更できる．
  電流制限付き位置制御モードで動かすためのtopic
  - `/dynamixel/cmd/profile` (`DynamixelCommand_Profile` type) :   
  profile_accelerationとprofile_velocityを設定するためのtopic
- - `/dynamixel/option/gain/w` (`DynamixelOption_Gain` type) : 未実装
- - `/dynamixel/option/limit/w` (`DynamixelOption_Limit` type) : 未実装
- - `/dynamixel/option/mode/w` (`DynamixelOption_Mode` type)  : 未実装
+ - `/dynamixel/opt/gain/w` (`DynamixelOption_Gain` type) : 未実装
+ - `/dynamixel/opt/limit/w` (`DynamixelOption_Limit` type) : 未実装
+ - `/dynamixel/opt/mode/w` (`DynamixelOption_Mode` type)  : 未実装
  
 #### Published from dyanmixel_handler　
 
@@ -231,9 +231,10 @@ ros param `use/split_read` によって変更できる．
 
  - /dynamixel/state
  - /dynamixel/error
- - /dynamixel/option/gain/r : 未実装
- - /dynamixel/option/limit/r
- - /dynamixel/option/mode/r : 未実装
+ - /dynamixel/opt/gain/r
+ - /dynamixel/opt/limit/r
+ - /dynamixel/opt/mode/r
+ - /dynamixel/opt/goal/r
 
 ***************************
 
@@ -345,24 +346,24 @@ note: profile_{~}は制御モードが変わると勝手に0に変更されて�
  - present_temperture : `/dynamixel/state`として, `loop_rate`のうち，`ratio/read_state`に一回の周期でpubされる 
 
 ### 制限 
- - temperature_limit  : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - max_voltage_limit     : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - min_voltage_limit     : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - pwm_limit   : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - current_limit   : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - acceleration_limit   : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - velocity_limit      : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - max_position_limit    : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
- - min_position_limit    : 未実装，`/dynamixel/option/limit/w`のsubで設定し，現在値を`/dynamixel/option/limit/r`としてpubできるにようにする．
+ - temperature_limit  : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - max_voltage_limit     : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - min_voltage_limit     : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - pwm_limit   : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - current_limit   : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - acceleration_limit   : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - velocity_limit      : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - max_position_limit    : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
+ - min_position_limit    : 現在値は`/dynamixel/option/limit/r`としてpubされる．未実装，`/dynamixel/option/limit/w`のsubで設定できるようにする．
 
 ### ゲイン
- - velocity_i_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
- - velocity_p_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
- - position_d_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
- - position_i_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
- - position_p_gain       : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
- - feedforward_acc_gain  : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
- - feedforward_vel_gain  : 未実装，`/dynamixel/option/gain/w`のsubで設定し，現在値を`/dynamixel/option/gain/r`としてpubできるにようにする．
+ - velocity_i_gain       : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
+ - velocity_p_gain       : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
+ - position_d_gain       : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
+ - position_i_gain       : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
+ - position_p_gain       : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
+ - feedforward_acc_gain  : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
+ - feedforward_vel_gain  : 現在値は`/dynamixel/option/gain/r`としてpubされる．未実装，`/dynamixel/option/gain/w`のsubで設定できるようにする．
 
 note: 制御モードによってデフォルト値が異なり，なんとモードを変えると勝手に書き換えられてしまう．制御モードをまたぐ場合の処理については検討中．
 
@@ -405,20 +406,16 @@ note: (bus_watchdog の設定値が1以上の時) bus_watchdogの設定値 × 20
 ***************************
 
 ### 未実装機能
- - 精度に合わせてpubする値を丸める
  - limit系
    - paramからの設定ができるようにする
-   - pubできるようにする
    - （subによる動的な設定はできなくていいか？）
  - gain系
    - paramから設定できるようにする
-   - pubできるようにする
    - 電源喪失・Rebootで初期化されていしまう問題の対処
    - モード変更によってモードごとのデフォルト値に初期化される問題の対処
      - FW ver 45 以上で使えるresotre_configurationだと，バックアップ作成時点の値になってしまい，意図と異なる場合が発生しかねない． 
  - mode系
    - paramから設定できるようにする
-   - pubできるようにする
  - commnad topic を service にする
  - 電流/速度制御時に通信が途切れたら自動で停止するようにする
  - External Portsをうまいことやる
