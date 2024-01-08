@@ -8,6 +8,9 @@ note: ROS1のみ対応
 
 note: Dynamixel Xシリーズのみ対応（Pシリーズの対応は後ほど予定している）
 
+> [!IMPORTANT]
+> このリポジトリの開発はRobotis日本支店の[公式リポジトリ](https://github.com/ROBOTIS-JAPAN-GIT/DynamixelHandler-ros1)に引き継がれました．
+
 ## features of this package
  - Dynamixelというサーボを動かすことに特化した最小単位のPkg
    - このPkgの dynamixel_handler node と ロボットの制御を行う別の node を組み合わせて使う
